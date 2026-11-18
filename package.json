@@ -1,0 +1,62 @@
+{
+  "name": "halo-drivers-ed",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @hde/web",
+    "dev:staging": "npm run dev:staging -w @hde/web",
+    "dev:api": "npm run dev -w @hde/api",
+    "build": "npm run type-check && npm run build -w @hde/web && npm run build -w @hde/api",
+    "type-check": "vue-tsc --build",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test:unit": "vitest run",
+    "test:db": "vitest run --config vitest.db.config.ts",
+    "test:e2e": "playwright test --config apps/web/playwright.config.ts",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:generate": "npm run db:generate -w @hde/api",
+    "db:migrate": "npm run db:migrate -w @hde/api",
+    "db:seed": "npm run db:seed -w @hde/api",
+    "db:reset": "npm run db:reset -w @hde/api",
+    "db:allow": "npm run db:allow -w @hde/api --",
+    "emulators": "node scripts/with-emulators.ts --keep-running --only auth -- node scripts/seed-emulators.ts",
+    "emulators:stop": "node scripts/stop-emulators.ts",
+    "deploy:web": "firebase deploy --only hosting",
+    "deploy:api": "node scripts/deploy-api.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/node": "^26.6.6",
+    "@vue/tsconfig": "^0.9.1",
+    "eslint": "^10.15.0",
+    "eslint-plugin-vue": "^10.12.1",
+    "firebase-tools": "^15.37.0",
+    "globals": "^17.14.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.73.0",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1",
+    "vue-tsc": "^3.3.14"
+  },
+  "allowScripts": {
+    "protobufjs": false,
+    "re2": false,
+    "fsevents": false,
+    "esbuild": false,
+    "@firebase/util": false,
+    "@parcel/watcher": false
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.7"
+  }
+}

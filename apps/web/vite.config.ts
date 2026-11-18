@@ -1,0 +1,42 @@
+import {defineConfig} from 'vite';
+import vue from '@vitejs/plugin-vue';
+import components from 'unplugin-vue-components/vite';
+import {PrimeVueResolver} from '@primevue/auto-import-resolver';
+
+export default defineConfig({
+  plugins: [
+    vue(),
+    // Registers the PrimeVue components templates use, so only those are bundled. The app's own
+    // components are imported explicitly (`dirs: []`).
+    components({dirs: [], resolvers: [PrimeVueResolver()], dts: 'src/components.d.ts'}),
+  ],
+  resolve: {
+    tsconfigPaths: true,
+  },
+  server: {
+    proxy: {
+      // The local API (`npm run dev:api`). The E2E tests point this at their own API instance.
+      '/api': process.env.HDE_API_URL ?? 'http://localhost:8081',
+    },
+  },
+  optimizeDeps: {
+    // The resolver adds PrimeVue imports as views first use them, so on a cold start the optimizer kept
+    // discovering new ones and re-bundling, and a page could load two copies of Vue ("reading 'ce'").
+    // PrimeVue ships ESM, so serve it as is.
+    exclude: ['primevue'],
+  },
+  build: {
+    rolldownOptions: {
+      output: {
+        // Libraries in their own chunks, which stay cached across deploys that only change app code.
+        advancedChunks: {
+          groups: [
+            {name: 'firebase', test: /node_modules[\\/](@firebase|firebase)[\\/]/},
+            {name: 'primevue', test: /node_modules[\\/](primevue|@primevue|@primeuix)[\\/]/},
+            {name: 'vue', test: /node_modules[\\/](@vue|vue|vue-router|pinia)[\\/]/},
+          ],
+        },
+      },
+    },
+  },
+});

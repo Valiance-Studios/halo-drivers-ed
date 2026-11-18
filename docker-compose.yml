@@ -1,0 +1,22 @@
+# Local PostgreSQL for development and tests (`npm run db:up`). Port 5433, so it never clashes with a
+# Postgres installed on the machine. Production uses Neon; see docs/DEPLOYMENT.md.
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: hde
+      POSTGRES_PASSWORD: hde
+      POSTGRES_DB: halo_drivers_ed
+    ports:
+      - "5433:5432"
+    volumes:
+      # From Postgres 18, the image keeps its data in a versioned folder under /var/lib/postgresql.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hde -d halo_drivers_ed"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+volumes:
+  postgres-data:

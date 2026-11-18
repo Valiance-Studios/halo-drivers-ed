@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    {"path": "./packages/shared"},
+    {"path": "./apps/api"},
+    {"path": "./apps/web"},
+    {"path": "./apps/web/tsconfig.test.json"},
+    {"path": "./apps/web/tsconfig.node.json"},
+    {"path": "./tsconfig.node.json"}
+  ]
+}

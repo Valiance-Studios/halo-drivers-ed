@@ -1,0 +1,31 @@
+{
+  "name": "@hde/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#src/*": "./src/*"
+  },
+  "scripts": {
+    "dev": "node --watch --env-file=.env.development src/server.ts",
+    "build": "node scripts/build.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node --env-file=.env.development scripts/migrate.ts",
+    "db:seed": "node --env-file=.env.development scripts/seed.ts",
+    "db:reset": "node --env-file=.env.development scripts/reset.ts",
+    "db:allow": "node --env-file=.env.development scripts/allow.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.9",
+    "drizzle-orm": "^0.45.4",
+    "firebase-admin": "^14.5.1",
+    "hono": "^4.13.19",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@hde/shared": "^0.1.0",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11",
+    "esbuild": "^0.28.2"
+  }
+}

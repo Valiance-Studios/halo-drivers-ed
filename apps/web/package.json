@@ -1,0 +1,31 @@
+{
+  "name": "@hde/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:staging": "vite --mode staging",
+    "build": "vite build",
+    "build:staging": "vite build --mode staging",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@hde/shared": "^0.1.0",
+    "@primeuix/themes": "^2.0.3",
+    "firebase": "^13.4.0",
+    "pinia": "^4.1.0",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.5.5",
+    "vue": "^3.5.45",
+    "vue-router": "^5.5.1"
+  },
+  "devDependencies": {
+    "@primevue/auto-import-resolver": "^4.5.5",
+    "@vitejs/plugin-vue": "^6.0.11",
+    "@vue/test-utils": "^2.6.0",
+    "jsdom": "^31.0.1",
+    "sass-embedded": "^1.108.2",
+    "unplugin-vue-components": "^32.1.0"
+  }
+}
