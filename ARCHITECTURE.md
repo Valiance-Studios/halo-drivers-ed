@@ -244,19 +244,17 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - Local development with Docker Postgres and the Auth emulator; unit, database and E2E tests.
 - API image, Cloud Build config and deploy script (migrate job, then service). **Not deployed yet**: see the setup checklist below.
 - GCP: Firebase web app "Halo Drivers Ed" created; Cloud Run, Artifact Registry, Cloud Build, Secret Manager, IAM, App Check, reCAPTCHA Enterprise and API Keys APIs enabled.
+- One-time setup (steps 1 to 5 of [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#one-time-setup)): Neon project with the `hde_owner` and `hde_app` roles, both connection strings in Secret Manager, the Artifact Registry repository and service accounts, the reCAPTCHA Enterprise key registered with App Check (site key in `apps/web/.env.staging`), Google sign-in enabled, and a registered App Check debug token for `npm run dev:staging`.
 
 ### Next: Setup Checklist (needs the owner)
 
 These need consoles, accounts or decisions; [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) has the commands for each.
 
-1. Create the Neon project and its two roles; store both connection strings in Secret Manager.
-2. One-time GCP setup: Artifact Registry repository, the two service accounts and their secret access, Cloud Build permissions.
-3. Create the reCAPTCHA Enterprise key, register it with App Check, and put the site key in `apps/web/.env.staging`.
-4. Enable the Google sign-in provider in Firebase Authentication.
-5. Allowlist your account in Neon (`npm run db:allow`).
-6. Deploy: `npm run deploy:api`, then `npm run deploy:web`. Then enforce App Check for Authentication.
-7. Lock down credentials: restrict the Firebase web API key (referrers and APIs), and check the service accounts have only their listed roles.
-8. Decide on PrimeVue 5 (see [Dependency Decisions](docs/DEVELOPMENT.md#dependency-decisions)) and on the repository's visibility (private for now).
+1. Deploy the API: `npm run deploy:api` (the first run against real resources, so expect small fixes).
+2. Allowlist your account in Neon (`npm run db:allow`), which needs the tables the migrate job creates.
+3. Deploy the web app: `npm run deploy:web`. Then enforce App Check for Authentication.
+4. Lock down credentials: restrict the Firebase web API key (referrers and APIs), and check the service accounts have only their listed roles.
+5. Decide on PrimeVue 5 (see [Dependency Decisions](docs/DEVELOPMENT.md#dependency-decisions)) and on the repository's visibility (private for now).
 
 ### Next: Features
 

@@ -6,9 +6,9 @@ Everything lives in the GCP project **`vs-halo-drivers-ed-dev`** (number 4274258
 
 ## One-Time Setup
 
-Done so far: the Firebase web app "Halo Drivers Ed" (config in `apps/web/.env.staging`), and these APIs enabled: Cloud Run, Artifact Registry, Cloud Build, Secret Manager, IAM, Firebase App Check, reCAPTCHA Enterprise, API Keys.
+Done so far: the Firebase web app "Halo Drivers Ed" (config in `apps/web/.env.staging`), these APIs enabled: Cloud Run, Artifact Registry, Cloud Build, Secret Manager, IAM, Firebase App Check, reCAPTCHA Enterprise, API Keys, and steps 1 to 5 below. Step 6 waits for the first deploy.
 
-Not yet tested end to end: the steps below and `npm run deploy:api` were written with the scaffold but not run against real resources. Expect small fixes on the first deploy.
+Not yet tested end to end: `npm run deploy:api` was written with the scaffold but not run against real resources. Expect small fixes on the first deploy.
 
 ### 1. Neon
 
@@ -16,6 +16,8 @@ Not yet tested end to end: the steps below and `npm run deploy:api` were written
 2. Use two roles, so the running API cannot change the schema:
    - **`hde_owner`**: owns the schema and runs migrations. Create it in the Neon console (Roles), or use the owner role Neon created.
    - **`hde_app`**: the API's role, reading and writing rows only. Create it with SQL as `hde_owner`, so it does not get Neon's `neon_superuser` membership, **before the first migration**, so the default privileges cover the tables it creates:
+
+     Replace `<generated password>` with a URL-safe password, such as the output of `openssl rand -hex 32`, since it also goes into a connection string. Postgres does not generate one.
 
      ```sql
      CREATE ROLE hde_app WITH LOGIN PASSWORD '<generated password>';
