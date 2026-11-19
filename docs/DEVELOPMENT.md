@@ -23,7 +23,7 @@ Four processes, each in its own terminal (Postgres runs in the background):
 
 ### Against Staging
 
-`npm run dev:staging` runs the web app against the real Firebase project. It needs an App Check debug token (see [Debug Tokens](DEPLOYMENT.md#debug-tokens)) and, for `/api`, a local API pointed at Neon; usually the emulators are what you want.
+`npm run dev:staging` runs the web app from source against the real Firebase project and the deployed API: Vite proxies `/api` to `HDE_API_URL` in `apps/web/.env.staging`, the hosted site, whose rewrite reaches the `hde-api` Cloud Run service. It needs an App Check debug token (see [Debug Tokens](DEPLOYMENT.md#debug-tokens)) and an allowlisted account. Local API changes are not used in this mode; for those, the emulators are what you want.
 
 ## Environment Files
 

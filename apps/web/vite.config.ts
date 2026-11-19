@@ -1,9 +1,17 @@
-import {defineConfig} from 'vite';
+import {defineConfig, loadEnv} from 'vite';
 import vue from '@vitejs/plugin-vue';
 import components from 'unplugin-vue-components/vite';
 import {PrimeVueResolver} from '@primevue/auto-import-resolver';
 
-export default defineConfig({
+/**
+ * Where the dev server sends `/api`: `HDE_API_URL` from the shell (the E2E tests' own API) or from the mode's
+ * env file (staging: the deployed API through Hosting's rewrite), else the local API (`npm run dev:api`).
+ */
+function apiTarget(mode: string): string {
+  return process.env.HDE_API_URL ?? loadEnv(mode, import.meta.dirname, 'HDE_').HDE_API_URL ?? 'http://localhost:8081';
+}
+
+export default defineConfig(({mode}) => ({
   plugins: [
     vue(),
     // Registers the PrimeVue components templates use, so only those are bundled. The app's own
@@ -15,8 +23,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      // The local API (`npm run dev:api`). The E2E tests point this at their own API instance.
-      '/api': process.env.HDE_API_URL ?? 'http://localhost:8081',
+      // `changeOrigin` sends the target's Host header, which Firebase Hosting needs to find the site.
+      '/api': {target: apiTarget(mode), changeOrigin: true},
     },
   },
   optimizeDeps: {
@@ -39,4 +47,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));
