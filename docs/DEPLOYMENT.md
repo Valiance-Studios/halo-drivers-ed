@@ -6,9 +6,9 @@ Everything lives in the GCP project **`vs-halo-drivers-ed-dev`** (number 4274258
 
 ## One-Time Setup
 
-Done so far: the Firebase web app "Halo Drivers Ed" (config in `apps/web/.env.staging`), these APIs enabled: Cloud Run, Artifact Registry, Cloud Build, Secret Manager, IAM, Firebase App Check, reCAPTCHA Enterprise, API Keys, and steps 1 to 5 below. Step 6 waits for the first deploy.
+Done for `vs-halo-drivers-ed-dev` (first deploy on 2026-11-19); the steps are kept for a new project such as production. Before step 1: create the Firebase web app "Halo Drivers Ed" (its config goes in `apps/web/.env.staging`), and enable these APIs: Cloud Run, Artifact Registry, Cloud Build, Secret Manager, IAM, Firebase App Check, reCAPTCHA Enterprise, API Keys.
 
-Not yet tested end to end: `npm run deploy:api` was written with the scaffold but not run against real resources. Expect small fixes on the first deploy.
+The project has exactly one web app. Registering a web app can also make Firebase create a "Browser key (auto created by Firebase)" with no restrictions; delete it, or restrict it as under [Credential Lockdown](#credential-lockdown).
 
 ### 1. Neon
 
@@ -30,7 +30,7 @@ Not yet tested end to end: `npm run deploy:api` was written with the scaffold bu
 
 3. Note the two connection strings (with `?sslmode=require`):
    - `hde_app` on the **pooled** endpoint (host contains `-pooler`), for the API.
-   - `hde_owner` on the **direct** endpoint, for migrations.
+   - `hde_owner` on the **direct** endpoint (the same host without `-pooler`), for migrations. The pooler runs in transaction mode, which can break the transaction Drizzle runs migrations in.
 
 ### 2. Secrets
 
@@ -90,10 +90,16 @@ The `hde-api` service allows unauthenticated invocations (`--allow-unauthenticat
      --domains=vs-halo-drivers-ed-dev.web.app,vs-halo-drivers-ed-dev.firebaseapp.com
    ```
 
-2. Firebase console → App Check → Apps → Halo Drivers Ed → register **reCAPTCHA Enterprise** with that site key.
+2. Firebase console → App Check → Apps → **Halo Drivers Ed** (the app whose ID is `VITE_FIREBASE_APP_ID` in `apps/web/.env.staging`) → register **reCAPTCHA Enterprise** with that site key. If the console offers to create a new app here, don't: the key would be registered on an app the site does not use, and every token exchange would fail with a 400 (`appCheck/throttled` in the browser). Check that it saved; the response must include `siteKey`:
+
+   ```sh
+   APP=$(grep '^VITE_FIREBASE_APP_ID=' apps/web/.env.staging | cut -d= -f2)
+   curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" -H 'x-goog-user-project: vs-halo-drivers-ed-dev' \
+     "https://firebaseappcheck.googleapis.com/v1/projects/vs-halo-drivers-ed-dev/apps/$APP/recaptchaEnterpriseConfig"
+   ```
 3. Put the site key in `apps/web/.env.staging` as `VITE_APPCHECK_SITE_KEY` and commit it (it is public). Deploys refuse to run without it.
 
-The API always requires App Check on Cloud Run (`APP_CHECK=required`; it refuses to start otherwise). After the first deploy works, also enforce App Check for **Authentication** in the console (App Check → APIs). This project is not shared with other apps, so enforcing affects only this one.
+The API always requires App Check on Cloud Run (`APP_CHECK=required`; it refuses to start otherwise). Once the deployed site signs in, enforce App Check for **Authentication** in the console (App Check → APIs); it is enforced in `vs-halo-drivers-ed-dev`. This project is not shared with other apps, so enforcing affects only this one.
 
 ### 5. Firebase Authentication
 
@@ -101,10 +107,11 @@ Firebase console → Authentication → Sign-in method → enable **Google**. `v
 
 ### 6. Allowlist Yourself
 
-After the first `npm run deploy:api` (whose migrate job creates the tables), add your account with the `hde_app` connection string. A shell variable takes precedence over `apps/api/.env.development`:
+After the first `npm run deploy:api` (whose migrate job creates the tables), add your account with the `hde_app` connection string, read from Secret Manager. A shell variable takes precedence over `apps/api/.env.development`:
 
 ```sh
-DATABASE_URL='postgres://hde_app:...-pooler.../halo_drivers_ed?sslmode=require' npm run db:allow -- you@example.com
+DATABASE_URL="$(gcloud secrets versions access latest --secret hde-database-url --project vs-halo-drivers-ed-dev)" \
+  npm run db:allow -- you@example.com
 ```
 
 ## Deploying
@@ -119,7 +126,7 @@ Deploy the API first: Hosting's `/api` rewrite needs the `hde-api` service to ex
 
 ## Credential Lockdown
 
-Do these before or right after the first deploy:
+Do these before the first deploy. All are done for `vs-halo-drivers-ed-dev`.
 
 - **Firebase web API key** (`VITE_FIREBASE_API_KEY`): public by design but unrestricted until restricted. In the console (APIs & Services → Credentials), or:
 
@@ -132,7 +139,7 @@ Do these before or right after the first deploy:
     --api-target=service=firebaseappcheck.googleapis.com
   ```
 
-  This breaks `npm run dev:staging` from `localhost` unless `http://localhost:5173/*` is added as a referrer. Local development against the emulators is not affected.
+  Add `localhost:5173/*` as a referrer too, for `npm run dev:staging` (it is on the dev project's key). A referrer is easy to fake outside a browser, so this costs little: App Check guards the API and, once enforced, Authentication, and only a registered debug token passes it from `localhost`. Leave it off a production project's key, and `localhost` off its Authentication authorized domains. Local development against the emulators does not use the key.
 - **reCAPTCHA key**: hosted domains only (as created above).
 - **Service accounts**: only the roles in the table above.
 - **Neon**: the API's role cannot change the schema; keep the owner password only in `hde-migrate-database-url`. Rotate a password by adding a new secret version.
@@ -142,7 +149,7 @@ Do these before or right after the first deploy:
 To run `npm run dev:staging` locally with App Check:
 
 1. Generate a token, e.g. `node -e "console.log(crypto.randomUUID())"`.
-2. Register it in Firebase console → App Check → Apps → Halo Drivers Ed → Manage debug tokens.
+2. Register it in Firebase console → App Check → Apps → **Halo Drivers Ed** → Manage debug tokens.
 3. Put `VITE_APPCHECK_DEBUG_TOKEN=<token>` in a gitignored `apps/web/.env.staging.local`.
 
-A registered debug token passes App Check, so the deploy check refuses any build that has one.
+A registered debug token passes App Check, so the deploy check refuses any build that has one: comment it out before `npm run deploy:web`. If it leaks, delete it under Manage debug tokens and register a new one.

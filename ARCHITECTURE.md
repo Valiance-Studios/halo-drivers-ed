@@ -242,19 +242,15 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - Postgres schema and first migration: vehicles, prerequisites, instructors, who teaches what, allowlist. Seeded catalog of 10 vehicles and 6 instructors.
 - Courses page: vehicles and instructors by faction, light/dark toggle.
 - Local development with Docker Postgres and the Auth emulator; unit, database and E2E tests.
-- API image, Cloud Build config and deploy script (migrate job, then service). **Not deployed yet**: see the setup checklist below.
-- GCP: Firebase web app "Halo Drivers Ed" created; Cloud Run, Artifact Registry, Cloud Build, Secret Manager, IAM, App Check, reCAPTCHA Enterprise and API Keys APIs enabled.
-- One-time setup (steps 1 to 5 of [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#one-time-setup)): Neon project with the `hde_owner` and `hde_app` roles, both connection strings in Secret Manager, the Artifact Registry repository and service accounts, the reCAPTCHA Enterprise key registered with App Check (site key in `apps/web/.env.staging`), Google sign-in enabled, and a registered App Check debug token for `npm run dev:staging`.
+- API image, Cloud Build config and deploy script (migrate job, then service).
+- Deployed on 2026-11-19 to `vs-halo-drivers-ed-dev`: the `hde-api` Cloud Run service, the `hde-migrate` job (tables and catalog seed in Neon) and the site at https://vs-halo-drivers-ed-dev.web.app, with the owner's account allowlisted. The whole [one-time setup](docs/DEPLOYMENT.md#one-time-setup) is done.
+- App Check: reCAPTCHA Enterprise registered for the web app, enforced for Authentication and required by the API; a debug token for `npm run dev:staging`, which proxies `/api` to the deployed API.
+- Credentials locked down: the Firebase web API key allows only the hosted domains and `localhost:5173`, and only the Identity Toolkit, Token Service and App Check APIs; each service account has only its listed roles.
 
-### Next: Setup Checklist (needs the owner)
+### Next: Decisions (need the owner)
 
-These need consoles, accounts or decisions; [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) has the commands for each.
-
-1. Deploy the API: `npm run deploy:api` (the first run against real resources, so expect small fixes).
-2. Allowlist your account in Neon (`npm run db:allow`), which needs the tables the migrate job creates.
-3. Deploy the web app: `npm run deploy:web`. Then enforce App Check for Authentication.
-4. Lock down credentials: restrict the Firebase web API key (referrers and APIs), and check the service accounts have only their listed roles.
-5. Decide on PrimeVue 5 (see [Dependency Decisions](docs/DEVELOPMENT.md#dependency-decisions)) and on the repository's visibility (private for now).
+1. PrimeVue 5 (see [Dependency Decisions](docs/DEVELOPMENT.md#dependency-decisions)).
+2. The repository's visibility (private for now).
 
 ### Next: Features
 
