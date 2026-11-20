@@ -1,0 +1,10 @@
+# Builds and pushes the API image. Run by `npm run deploy:api` (scripts/deploy-api.ts) from the repository
+# root, which passes the image name as _IMAGE and runs the build as sa-hde-build-dev.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '-f', 'apps/api/Dockerfile', '-t', '${_IMAGE}', '.']
+images:
+  - '${_IMAGE}'
+options:
+  # Required when a build runs as a user-specified service account: logs go to Cloud Logging only.
+  logging: CLOUD_LOGGING_ONLY
