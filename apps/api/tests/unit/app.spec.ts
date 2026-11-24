@@ -213,6 +213,8 @@ describe('API', () => {
     ['sign-off', '{"results":{"a":"maybe"},"attendance":"attended"}'],
     ['results/startEngine', '{}'],
     ['results/startEngine', '{"result":"maybe"}'],
+    ['results/startEngine', '{"result":"pass","early":"yes"}'],
+    ['sign-off', '{"results":{},"attendance":"missed","early":1}'],
   ])('rejects %s with %s', async (path, body) => {
     const response = await makeApp().request(`/api/admin/lessons/${BOOKING.id}/${path}`, {
       method: 'PUT',

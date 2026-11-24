@@ -31,6 +31,17 @@
         <strong>{{ statusNames[lesson.status] }}</strong>
         <template v-if="isSignedOff">. To correct it, change the form and sign it off again.</template>
       </p>
+      <label
+        v-if="!hasEnded"
+        class="lesson-form__early"
+      >
+        <input
+          v-model="early"
+          type="checkbox"
+          :disabled="saving || !isSaved"
+        />
+        Mark and sign off early, before the lesson has finished
+      </label>
       <ul class="lesson-form__skills">
         <li
           v-for="skill in form.lesson.skills"
@@ -49,7 +60,7 @@
           <ResultToggle
             :model-value="results[skill.id] ?? null"
             :label="skill.label"
-            :disabled="saving || !hasStarted || form.passedBefore.includes(skill.id)"
+            :disabled="saving || !canMark || form.passedBefore.includes(skill.id)"
             @update:model-value="mark(skill.id, $event)"
           />
           <p
@@ -80,7 +91,7 @@
       <div class="lesson-form__actions">
         <Button
           label="Sign off lesson"
-          :disabled="!hasEnded || !isMarked || !isSaved"
+          :disabled="!canSignOff || !isMarked || !isSaved"
           :loading="saving"
           @click="signOff('attended')"
         />
@@ -88,7 +99,7 @@
           label="Student missed it"
           severity="secondary"
           outlined
-          :disabled="!hasEnded || !isSaved || saving"
+          :disabled="!canSignOff || !isSaved || saving"
           @click="signOff('missed')"
         />
       </div>
@@ -150,6 +161,8 @@ export default defineComponent({
       errorMessage: '',
       notice: '',
       hasMarked: false,
+      /** Overrides waiting for the lesson to start and end. */
+      early: false,
       now: new Date(),
       statusNames: STATUS_NAMES,
     };
@@ -161,6 +174,12 @@ export default defineComponent({
     },
     hasStarted(): boolean {
       return this.lesson !== null && new Date(this.lesson.startsAt) <= this.now;
+    },
+    canMark(): boolean {
+      return this.hasStarted || this.early;
+    },
+    canSignOff(): boolean {
+      return this.hasEnded || this.early;
     },
     isSaved(): boolean {
       return Object.keys(this.markStates).length === 0;
@@ -190,11 +209,11 @@ export default defineComponent({
         return '';
       }
 
-      if (!this.hasStarted) {
+      if (!this.canMark) {
         return 'Skills can be marked once the lesson starts, and it can be signed off once it ends.';
       }
 
-      if (!this.hasEnded) {
+      if (!this.canSignOff) {
         return 'The lesson can be signed off once it ends.';
       }
 
@@ -210,7 +229,8 @@ export default defineComponent({
     },
   },
   created() {
-    const save = (skillId: string, result: SkillResult | null) => api.markSkill(this.id, skillId, result);
+    const save = (skillId: string, result: SkillResult | null) =>
+      api.markSkill(this.id, skillId, {result, early: this.early});
     this.saver = markRaw(new MarkSaver(save, (skillId, state) => this.setMarkState(skillId, state)));
   },
   mounted() {
@@ -271,7 +291,7 @@ export default defineComponent({
       this.notice = '';
 
       try {
-        const {status} = await api.signOffLesson(this.id, {results: this.results, attendance});
+        const {status} = await api.signOffLesson(this.id, {results: this.results, attendance, early: this.early});
         await this.refresh();
         this.hasMarked = false;
         this.notice = `Signed off: ${STATUS_NAMES[status].toLowerCase()}.`;
@@ -325,6 +345,20 @@ export default defineComponent({
 
     > span {
       flex: 1 1 18rem;
+    }
+  }
+
+  &__early {
+    display: inline-flex;
+    gap: 0.625rem;
+    align-items: center;
+    min-height: 2.75rem;
+    cursor: pointer;
+
+    input {
+      width: 1.25rem;
+      height: 1.25rem;
+      accent-color: var(--app-primary);
     }
   }
 

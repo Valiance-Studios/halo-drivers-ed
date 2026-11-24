@@ -174,7 +174,7 @@ A lesson can be cancelled until 24 hours before it starts. It counts toward its 
 
 ## Lesson Sign-Off
 
-Each booked lesson has a form: the skills of the first lesson in its course the student has not completed. From when the lesson starts, each mark is saved on its own (`PUT /api/admin/lessons/:id/results/:skillId`), so marks made together do not overwrite each other; `MarkSaver` in the web app sends one skill's marks in order. The lesson is signed off once it ends (`PUT .../sign-off`). The instructors are seeded characters, so admins do this, optionally viewing as one (`?instructor=` on `GET /api/admin/lessons`, a filter rather than another sign-in).
+Each booked lesson has a form: the skills of the first lesson in its course the student has not completed. From when the lesson starts, each mark is saved on its own (`PUT /api/admin/lessons/:id/results/:skillId`), so marks made together do not overwrite each other; `MarkSaver` in the web app sends one skill's marks in order. The lesson is signed off once it ends (`PUT .../sign-off`). Both refuse to be early unless the request says `early: true`, an override that, like the rest of `/api/admin`, only admins have. The instructors are seeded characters, so admins do this, optionally viewing as one (`?instructor=` on `GET /api/admin/lessons`, a filter rather than another sign-in).
 
 ```mermaid
 stateDiagram-v2

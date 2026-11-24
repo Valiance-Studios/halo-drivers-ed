@@ -11,7 +11,6 @@ import type {
   LessonSlot,
   Me,
   SkillMark,
-  SkillResult,
   Vehicle,
 } from '@hde/shared';
 
@@ -104,8 +103,8 @@ export class ApiClient {
   }
 
   /** Saves one skill's mark; null clears it. */
-  markSkill(id: string, skillId: string, result: SkillResult | null): Promise<SkillMark> {
-    return this.put(`/admin/lessons/${encodeURIComponent(id)}/results/${encodeURIComponent(skillId)}`, {result});
+  markSkill(id: string, skillId: string, mark: SkillMark): Promise<SkillMark> {
+    return this.put(`/admin/lessons/${encodeURIComponent(id)}/results/${encodeURIComponent(skillId)}`, mark);
   }
 
   signOffLesson(id: string, signOff: LessonSignOff): Promise<AdminLesson> {

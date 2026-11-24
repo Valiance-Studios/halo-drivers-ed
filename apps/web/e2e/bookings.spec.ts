@@ -32,6 +32,11 @@ test('books a course until its lessons run out, and cancels', async ({page}) => 
   await expect(page.getByRole('button', {name: 'Pass', exact: true}).first()).toBeDisabled();
   await expect(page.getByText(/^Skills can be marked once the lesson starts/)).toBeVisible();
 
+  // Unless they choose to mark it early.
+  await page.getByLabel('Mark and sign off early').check();
+  await page.getByRole('button', {name: 'Pass', exact: true}).first().click();
+  await expect(page.getByText('All changes saved.')).toBeVisible();
+
   await page.getByRole('link', {name: 'My lessons'}).click();
   const cancel = page.getByRole('button', {name: 'Cancel lesson'});
   await expect(cancel).toHaveCount(2);

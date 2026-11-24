@@ -19,25 +19,25 @@ function isSkillResults(value: unknown): value is SkillResults {
 
 /** Check requests' JSON bodies, which could hold anything. */
 function parseSkillMark(body: unknown): SkillMark {
-  const {result} = (body ?? {}) as Record<string, unknown>;
+  const {result, early = false} = (body ?? {}) as Record<string, unknown>;
   const known = SKILL_RESULTS.find((value) => value === result) ?? null;
 
-  if (known !== result) {
-    throw new ApiError(400, 'invalid-request', 'Send pass, fail or null.');
+  if (known !== result || typeof early !== 'boolean') {
+    throw new ApiError(400, 'invalid-request', 'Send pass, fail or null, and whether it is early.');
   }
 
-  return {result: known};
+  return {result: known, early};
 }
 
 function parseSignOff(body: unknown): LessonSignOff {
-  const {results, attendance} = (body ?? {}) as Record<string, unknown>;
+  const {results, attendance, early = false} = (body ?? {}) as Record<string, unknown>;
   const known = ATTENDANCES.find((value) => value === attendance);
 
-  if (!isSkillResults(results) || !known) {
+  if (!isSkillResults(results) || !known || typeof early !== 'boolean') {
     throw new ApiError(400, 'invalid-request', 'Send the skill results and how the lesson ended.');
   }
 
-  return {results, attendance: known};
+  return {results, attendance: known, early};
 }
 
 /** The signed-in student's own results. */

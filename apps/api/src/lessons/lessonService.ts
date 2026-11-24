@@ -54,10 +54,10 @@ export class LessonService {
   }
 
   /** Saves one skill's mark, so marks made at the same time do not overwrite each other. */
-  async mark(id: string, skillId: string, {result}: SkillMark): Promise<void> {
+  async mark(id: string, skillId: string, {result, early}: SkillMark): Promise<void> {
     const curriculum = await this.catalog.listCurriculum();
     const lesson = await this.lessons.update(id, (context) => {
-      if (this.now() < new Date(context.lesson.startsAt)) {
+      if (!early && this.now() < new Date(context.lesson.startsAt)) {
         throw new ApiError(409, 'too-early', 'Skills can be marked once the lesson starts.');
       }
 
@@ -85,7 +85,7 @@ export class LessonService {
   async signOff(id: string, signOff: LessonSignOff, by: string): Promise<AdminLesson> {
     const [vehicles, curriculum] = await Promise.all([this.catalog.listVehicles(), this.catalog.listCurriculum()]);
     const lesson = await this.lessons.update(id, (context) => {
-      if (this.now() < new Date(context.lesson.endsAt)) {
+      if (!signOff.early && this.now() < new Date(context.lesson.endsAt)) {
         throw new ApiError(409, 'too-early', 'A lesson can be signed off once it ends.');
       }
 

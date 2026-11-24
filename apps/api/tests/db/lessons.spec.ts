@@ -42,7 +42,8 @@ function marks(number: number, result: SkillResult, except: SkillResults = {}, v
   return {...Object.fromEntries(lesson!.skills.map(({id}) => [id, result])), ...except};
 }
 
-const signOff = (id: string, results: SkillResults) => service.signOff(id, {results, attendance: 'attended'}, ADMIN);
+const signOff = (id: string, results: SkillResults) =>
+  service.signOff(id, {results, attendance: 'attended', early: false}, ADMIN);
 
 async function errorCode(call: Promise<unknown>): Promise<string | undefined> {
   return call.then(
@@ -101,22 +102,35 @@ describe('lesson forms', () => {
     const during = new LessonService(new PostgresLessonRepository(db), catalog, () => at(10, 12.5));
     const before = new LessonService(new PostgresLessonRepository(db), catalog, () => at(10, 11));
 
-    expect(await errorCode(before.mark(id, 'startEngine', {result: 'pass'}))).toBe('too-early');
-    await during.mark(id, 'startEngine', {result: 'fail'});
-    await during.mark(id, 'startEngine', {result: 'pass'});
+    expect(await errorCode(before.mark(id, 'startEngine', {result: 'pass', early: false}))).toBe('too-early');
+    await during.mark(id, 'startEngine', {result: 'fail', early: false});
+    await during.mark(id, 'startEngine', {result: 'pass', early: false});
     expect((await service.form(id)).results).toEqual({startEngine: 'pass'});
-    await during.mark(id, 'startEngine', {result: null});
+    await during.mark(id, 'startEngine', {result: null, early: false});
     expect((await service.form(id)).results).toEqual({});
-    expect(await errorCode(during.mark(id, 'winch', {result: null}))).toBe('invalid-request');
-    expect(await errorCode(during.signOff(id, {results: marks(1, 'pass'), attendance: 'attended'}, ADMIN))).toBe(
-      'too-early',
-    );
+    expect(await errorCode(during.mark(id, 'winch', {result: null, early: false}))).toBe('invalid-request');
+    expect(
+      await errorCode(during.signOff(id, {results: marks(1, 'pass'), attendance: 'attended', early: false}, ADMIN)),
+    ).toBe('too-early');
+  });
+
+  it('can be marked and signed off early, when asked to', async () => {
+    const id = await book(at(20));
+    expect(await errorCode(service.mark(id, 'startEngine', {result: 'pass', early: false}))).toBe('too-early');
+    await service.mark(id, 'startEngine', {result: 'pass', early: true});
+    expect((await service.form(id)).results).toEqual({startEngine: 'pass'});
+
+    expect(await errorCode(signOff(id, marks(1, 'pass')))).toBe('too-early');
+    const signedOff = service.signOff(id, {results: marks(1, 'pass'), attendance: 'attended', early: true}, ADMIN);
+    expect(await signedOff).toMatchObject({status: 'completed'});
   });
 
   it('keeps every mark when skills are marked at the same time', async () => {
     const id = await book(at(8));
     const expected = marks(1, 'pass');
-    await Promise.all(Object.keys(expected).map((skillId) => service.mark(id, skillId, {result: 'pass'})));
+    await Promise.all(
+      Object.keys(expected).map((skillId) => service.mark(id, skillId, {result: 'pass', early: false})),
+    );
 
     expect((await service.form(id)).results).toEqual(expected);
   });
@@ -141,7 +155,11 @@ describe('lesson forms', () => {
 
   it('records a missed lesson, which does not count', async () => {
     const id = await book(at(8));
-    const missed = await service.signOff(id, {results: {startEngine: 'pass'}, attendance: 'missed'}, ADMIN);
+    const missed = await service.signOff(
+      id,
+      {results: {startEngine: 'pass'}, attendance: 'missed', early: false},
+      ADMIN,
+    );
 
     expect(missed).toMatchObject({status: 'missed', lessonNumber: null});
     expect((await service.form(id)).results).toEqual({});
@@ -161,7 +179,7 @@ describe('lesson forms', () => {
     await signOff(id, marks(1, 'fail'));
 
     expect(await signOff(id, marks(1, 'pass'))).toMatchObject({status: 'completed'});
-    expect(await errorCode(service.mark(id, 'startEngine', {result: 'fail'}))).toBe('sign-off-conflict');
+    expect(await errorCode(service.mark(id, 'startEngine', {result: 'fail', early: false}))).toBe('sign-off-conflict');
   });
 
   it('refuses a correction that would lock a course the student has lessons in', async () => {

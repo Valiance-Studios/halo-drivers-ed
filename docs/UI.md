@@ -51,4 +51,6 @@ The student's name (their email until they have signed in) and the lesson's skil
 - **Sign off lesson** works once the lesson has ended and every skill is marked and saved: all passed completes it, and otherwise the student repeats it.
 - **Student missed it** works once the lesson has ended, and discards any marks.
 
+Until the lesson ends, a checkbox allows marking and signing it off early. It is off each time the form opens.
+
 Changes to a signed-off lesson are not saved until it is signed off again, which can be done until a later lesson in the course is signed off.
