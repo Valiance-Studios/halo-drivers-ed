@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <!-- A steering wheel inside a ring: original artwork, not a Halo logo. -->
   <style>
-    .mark { stroke: #0f766e; }
-    @media (prefers-color-scheme: dark) { .mark { stroke: #5eead4; } }
+    .mark { stroke: #2c5e3b; }
+    @media (prefers-color-scheme: dark) { .mark { stroke: #79bc86; } }
   </style>
   <g class="mark" fill="none" stroke-width="3">
     <circle cx="16" cy="16" r="12" />

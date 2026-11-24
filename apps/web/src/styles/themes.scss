@@ -1,0 +1,84 @@
+// The theme tokens: each faction's type and shapes, and its colors in light and dark mode. stores/theme.ts sets
+// the classes on <html>; plugins/primevue.ts gives PrimeVue the same colors.
+
+.theme-unsc {
+  --app-font-display: 'Overpass', sans-serif;
+  --app-font-body: 'Overpass', sans-serif;
+  --app-display-weight: 800;
+  --app-panel-radius: 4px;
+  --app-node-radius: 4px;
+  --app-control-radius: 4px;
+  --app-header-radius: 0;
+  --app-header-edge: 5px solid #f08022;
+  --app-road-width: 16px;
+  --app-lane-width: 2px;
+  --app-lane-dash: 12 9;
+  --app-node-selected-shadow: inset 0 0 0 3px var(--app-primary), inset 0 0 0 5px var(--app-on-primary);
+
+  --app-bg: #e6ede0;
+  --app-surface: #fafcf7;
+  --app-line: #b3c3ae;
+  --app-text: #17241a;
+  --app-muted: #47594b;
+  --app-primary: #2c5e3b;
+  --app-on-primary: #fff;
+  --app-accent: #e8741a;
+  --app-accent-text: #9c4100;
+  --app-header: #2c5e3b;
+  --app-road: #9fb39d;
+
+  &.app-dark {
+    --app-bg: #17211a;
+    --app-surface: #203026;
+    --app-line: #3f5947;
+    --app-text: #e6ede2;
+    --app-muted: #afc0af;
+    --app-primary: #79bc86;
+    --app-on-primary: #102013;
+    --app-accent: #ff9a3d;
+    --app-accent-text: #ffab5e;
+    --app-header: #24482f;
+    --app-road: #33493a;
+  }
+}
+
+.theme-covenant {
+  --app-font-display: 'Philosopher', serif;
+  --app-font-body: 'Alegreya Sans', sans-serif;
+  --app-display-weight: 700;
+  --app-panel-radius: 44px 14px 44px 14px;
+  --app-node-radius: 34px 12px 34px 12px;
+  --app-control-radius: 22px;
+  --app-header-radius: 0 0 36px 36px;
+  --app-header-edge: 0 solid transparent;
+  --app-road-width: 12px;
+  --app-lane-width: 3px;
+  --app-lane-dash: none;
+  --app-node-selected-shadow: 0 0 0 4px var(--app-bg), 0 0 0 7px var(--app-accent);
+
+  --app-bg: #ece5f7;
+  --app-surface: #fbf9ff;
+  --app-line: #c4b1e0;
+  --app-text: #241542;
+  --app-muted: #594679;
+  --app-primary: #6233b5;
+  --app-on-primary: #fff;
+  --app-accent: #0e87ae;
+  --app-accent-text: #0a6080;
+  --app-header: #6233b5;
+  --app-road: #bba3df;
+
+  &.app-dark {
+    --app-bg: #1b1230;
+    --app-surface: #2a1c48;
+    --app-line: #583e88;
+    --app-text: #efe8fb;
+    --app-muted: #c0afde;
+    --app-primary: #b48cff;
+    --app-on-primary: #1c0f38;
+    --app-accent: #6fd6f2;
+    --app-accent-text: #8addf4;
+    --app-header: #42267c;
+    --app-road: #442d70;
+  }
+}

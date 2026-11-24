@@ -55,7 +55,7 @@ flowchart LR
 ### Tech Stack
 
 - **Monorepo** with npm workspaces: `apps/web`, `apps/api`, `packages/shared`.
-- **Web**: Vue 3 (Options API) + TypeScript, PrimeVue 4 (Aura theme, components auto-imported), Pinia, Vue Router, SCSS with BEM class names, Vite (through Vite+).
+- **Web**: Vue 3 (Options API) + TypeScript, PrimeVue 4 (Aura, colored by the app's [theme tokens](#theming); components auto-imported), Pinia, Vue Router, SCSS with BEM class names, self-hosted fonts (Fontsource), Vite (through Vite+).
 - **API**: Node 26 + TypeScript, Hono on `@hono/node-server`, Drizzle ORM and drizzle-kit migrations, `pg`, Firebase Admin SDK (token verification only). Run from source with Node's type stripping in development; bundled with esbuild for the container.
 - **Shared**: the API's request and response types and constants (`@hde/shared`), imported as TypeScript source by both apps.
 - **Data**: PostgreSQL 18; Neon in production, Docker Compose locally.
@@ -132,6 +132,23 @@ sequenceDiagram
 `APP_CHECK=off` exists only for the emulators. `loadConfig` refuses to start on Cloud Run (`K_SERVICE` set) with App Check off or with `FIREBASE_AUTH_EMULATOR_HOST` set, since either would let anyone in.
 
 On the web side, `stores/auth.ts` calls `GET /api/me` after each Google sign-in. A `not-allowed` answer signs the account out with a message on the login page; other failures keep it signed in so a retry can succeed. The popup and the auth listener share one check.
+
+## Theming
+
+A theme is a faction plus a color mode. `stores/theme.ts` sets classes on `<html>`, which select the tokens in `styles/themes.scss`. PrimeVue's preset only refers to those tokens, so switching needs no new preset.
+
+```mermaid
+flowchart LR
+    factionToggle["FactionToggle"] -- "toggleFaction()" --> store
+    modeToggle["ThemeToggle"] -- "toggle()" --> store
+    system["prefers-color-scheme"] -- "until a mode is chosen" --> store
+    store["stores/theme.ts"] <-- "load, save" --> storage[("localStorage<br/>theme, theme-faction")]
+    store -- "theme-unsc or theme-covenant,<br/>app-dark" --> html["html element classes"]
+    html -- "select" --> tokens["styles/themes.scss<br/>--app-* tokens"]
+    tokens --> components["App components"]
+    tokens --> preset["plugins/primevue.ts<br/>HaloPreset"]
+    preset --> prime["PrimeVue components"]
+```
 
 ## Data Model
 
@@ -230,6 +247,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 | System context | [System Overview](#system-overview) | GCP or Firebase services, Neon, `firebase.json` rewrites, `apps/web/src/plugins/firebase.ts` |
 | Application layers | [Application Layers](#application-layers) | Folders under `apps/*/src`, `packages/shared`, `apps/api/src/server.ts` |
 | Request authorization | [Request Authorization](#request-authorization) | `apps/api/src/app.ts`, `apps/api/src/config.ts`, `apps/web/src/services/apiClient.ts`, `apps/web/src/stores/auth.ts` |
+| Theming | [Theming](#theming) | `apps/web/src/stores/theme.ts`, `apps/web/src/utils/themePreference.ts`, `apps/web/src/styles/themes.scss`, `apps/web/src/plugins/primevue.ts`, `FactionToggle.vue`, `ThemeToggle.vue` |
 | Tables | [Data Model](#data-model) | `apps/api/src/db/schema.ts`, `apps/api/drizzle/` |
 | Deploy pipeline | [Deployment](#deployment) | `scripts/deploy-api.ts`, `apps/api/Dockerfile`, `apps/api/cloudbuild.yaml`, `firebase.json` |
 
@@ -241,7 +259,8 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - Google sign-in with the allowlist held by the API (`GET /api/me`), and a route guard.
 - API with App Check and ID token checks, JSON errors, and a config that refuses unsafe settings on Cloud Run.
 - Postgres schema and first migration: vehicles, prerequisites, instructors, who teaches what, allowlist. Seeded catalog of 10 vehicles and 6 instructors.
-- Courses page: vehicles and instructors by faction, light/dark toggle.
+- Courses page: vehicles on a route map of their prerequisites, and instructors, by faction.
+- UNSC and Covenant themes, each light and dark, with placeholder artwork.
 - Local development with Docker Postgres and the Auth emulator; unit, database and E2E tests.
 - API image, Cloud Build config and deploy script (migrate job, then service).
 - Deployed on 2026-11-19 to `vs-halo-drivers-ed-dev`: the `hde-api` Cloud Run service, the `hde-migrate` job (tables and catalog seed in Neon) and the site at https://vs-halo-drivers-ed-dev.web.app, with the owner's account allowlisted. The whole [one-time setup](docs/DEPLOYMENT.md#one-time-setup) is done.
@@ -258,4 +277,4 @@ Every diagram in this file, and what it depends on. A change to these sources up
 1. Bookings: availability, the booking flow, double-booking constraints, prerequisite checks.
 2. Admin "View As" an instructor, or everything.
 3. Demo slots for recruiters.
-4. Design pass: a distinctive look for the pages (original artwork; no official Halo logos or images).
+4. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. See [Artwork](docs/UI.md#artwork).

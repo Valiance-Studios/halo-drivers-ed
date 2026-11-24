@@ -7,21 +7,37 @@ import {definePreset} from '@primeuix/themes';
 /** The class on <html> that switches PrimeVue to its dark scheme (see stores/theme.ts). */
 export const DARK_MODE_CLASS = 'app-dark';
 
-/** Aura with a teal primary color. A placeholder until the pages get their designed look. */
+/** PrimeVue takes its colors from the app's tokens (styles/themes.scss), so changing theme needs no new preset. */
+const COLORS = {
+  primary: {
+    color: 'var(--app-primary)',
+    contrastColor: 'var(--app-on-primary)',
+    hoverColor: 'color-mix(in srgb, var(--app-primary) 88%, var(--app-text))',
+    activeColor: 'color-mix(in srgb, var(--app-primary) 78%, var(--app-text))',
+  },
+  content: {
+    background: 'var(--app-surface)',
+    borderColor: 'var(--app-line)',
+    color: 'var(--app-text)',
+  },
+  text: {
+    color: 'var(--app-text)',
+    hoverColor: 'var(--app-text)',
+    mutedColor: 'var(--app-muted)',
+    hoverMutedColor: 'var(--app-text)',
+  },
+};
+
 const HaloPreset = definePreset(Aura, {
   semantic: {
-    primary: {
-      50: '{teal.50}',
-      100: '{teal.100}',
-      200: '{teal.200}',
-      300: '{teal.300}',
-      400: '{teal.400}',
-      500: '{teal.500}',
-      600: '{teal.600}',
-      700: '{teal.700}',
-      800: '{teal.800}',
-      900: '{teal.900}',
-      950: '{teal.950}',
+    colorScheme: {light: COLORS, dark: COLORS},
+  },
+  components: {
+    tabs: {
+      tablist: {background: 'transparent'},
+      tab: {activeColor: 'var(--app-text)'},
+      tabpanel: {background: 'transparent', padding: '0'},
+      activeBar: {background: 'var(--app-accent)', height: '4px'},
     },
   },
 });

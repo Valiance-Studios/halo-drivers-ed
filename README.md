@@ -7,8 +7,8 @@ A non-commercial fan project and portfolio piece. Halo and its characters belong
 ## Features
 
 - Google sign-in, limited to an allowlist held by the API.
-- Course catalog by faction: what each vehicle's course covers, how long it takes, what it requires and who teaches it.
-- Light and dark themes.
+- Course catalog by faction, drawn as a route along the prerequisites: what each vehicle's course covers, how long it takes, what it requires and who teaches it.
+- UNSC and Covenant themes, each with light and dark modes.
 
 Coming next: booking lessons, an admin "View As" mode for each instructor, and self-serve demo access for recruiters. See [Project Status](ARCHITECTURE.md#project-status).
 
