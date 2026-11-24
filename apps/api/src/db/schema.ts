@@ -1,6 +1,19 @@
 import {sql} from 'drizzle-orm';
-import {check, foreignKey, integer, pgEnum, pgTable, primaryKey, text, timestamp, unique} from 'drizzle-orm/pg-core';
-import {FACTIONS, ROLES, VEHICLE_DOMAINS} from '@hde/shared';
+import {
+  check,
+  foreignKey,
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  text,
+  time,
+  timestamp,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core';
+import {BOOKING_STATUSES, FACTIONS, ROLES, VEHICLE_DOMAINS} from '@hde/shared';
 
 /*
  * Column names are snake_case in the database and camelCase here (`casing: 'snake_case'` in both
@@ -10,6 +23,7 @@ import {FACTIONS, ROLES, VEHICLE_DOMAINS} from '@hde/shared';
 export const factionEnum = pgEnum('faction', FACTIONS);
 export const vehicleDomainEnum = pgEnum('vehicle_domain', VEHICLE_DOMAINS);
 export const roleEnum = pgEnum('role', ROLES);
+export const bookingStatusEnum = pgEnum('booking_status', BOOKING_STATUSES);
 
 export const vehicles = pgTable(
   'vehicles',
@@ -94,4 +108,59 @@ export const allowedUsers = pgTable(
     createdAt: timestamp({withTimezone: true}).notNull().defaultNow(),
   },
   (table) => [check('allowed_users_email_lowercase', sql`${table.email} = lower(${table.email})`)],
+);
+
+/** Each instructor's weekly hours, as wall-clock times in the school's time zone (see lessonSlots.ts). */
+export const instructorAvailability = pgTable(
+  'instructor_availability',
+  {
+    instructorSlug: text()
+      .notNull()
+      .references(() => instructors.slug, {onDelete: 'cascade'}),
+    /** ISO weekday: 1 is Monday, 7 is Sunday. */
+    weekday: integer().notNull(),
+    startsAt: time({precision: 0}).notNull(),
+    endsAt: time({precision: 0}).notNull(),
+  },
+  (table) => [
+    primaryKey({columns: [table.instructorSlug, table.weekday, table.startsAt]}),
+    check('instructor_availability_weekday', sql`${table.weekday} between 1 and 7`),
+    check('instructor_availability_order', sql`${table.startsAt} < ${table.endsAt}`),
+  ],
+);
+
+/**
+ * Lessons. The faction is part of both foreign keys, as in instructor_vehicles. It does not reference that
+ * table, which the seed replaces. Exclusion constraints, which Drizzle cannot declare, are in the
+ * booking_exclusions migration: a student, an instructor and a vehicle each have one lesson at a time.
+ */
+export const bookings = pgTable(
+  'bookings',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    studentEmail: text()
+      .notNull()
+      .references(() => allowedUsers.email, {onDelete: 'cascade'}),
+    instructorSlug: text().notNull(),
+    vehicleSlug: text().notNull(),
+    faction: factionEnum().notNull(),
+    startsAt: timestamp({withTimezone: true}).notNull(),
+    endsAt: timestamp({withTimezone: true}).notNull(),
+    status: bookingStatusEnum().notNull().default('booked'),
+    createdAt: timestamp({withTimezone: true}).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      name: 'bookings_instructor_fkey',
+      columns: [table.instructorSlug, table.faction],
+      foreignColumns: [instructors.slug, instructors.faction],
+    }),
+    foreignKey({
+      name: 'bookings_vehicle_fkey',
+      columns: [table.vehicleSlug, table.faction],
+      foreignColumns: [vehicles.slug, vehicles.faction],
+    }),
+    check('bookings_order', sql`${table.startsAt} < ${table.endsAt}`),
+    index('bookings_student_idx').on(table.studentEmail, table.startsAt),
+  ],
 );

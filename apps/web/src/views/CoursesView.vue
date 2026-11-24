@@ -8,8 +8,14 @@
     >
       {{ catalogStore.errorMessage }}
     </Message>
+    <Message
+      v-else-if="bookingsStore.errorMessage"
+      severity="error"
+    >
+      {{ bookingsStore.errorMessage }}
+    </Message>
     <ProgressSpinner
-      v-else-if="catalogStore.loading"
+      v-else-if="catalogStore.loading || !bookingsStore.loaded"
       class="courses__spinner"
       aria-label="Loading courses"
     />
@@ -44,6 +50,7 @@
 import {defineComponent} from 'vue';
 import {mapStores} from 'pinia';
 import {FACTION_NAMES, FACTIONS} from '@hde/shared';
+import {useBookingsStore} from '@/stores/bookings';
 import {useCatalogStore} from '@/stores/catalog';
 import {useThemeStore} from '@/stores/theme';
 import FactionCourses from '@/components/FactionCourses.vue';
@@ -60,10 +67,11 @@ export default defineComponent({
     };
   },
   computed: {
-    ...mapStores(useCatalogStore, useThemeStore),
+    ...mapStores(useBookingsStore, useCatalogStore),
   },
   mounted() {
     void this.catalogStore.load();
+    void this.bookingsStore.load();
   },
 });
 </script>

@@ -18,24 +18,24 @@
       </p>
       <Button
         class="vehicle-detail__book"
-        :label="`Book ${vehicle.name} course`"
+        :label="`Book ${vehicle.name} lesson`"
         :icon="isLocked ? 'pi pi-lock' : 'pi pi-calendar'"
-        :severity="isLocked ? 'secondary' : undefined"
-        :disabled="isLocked"
-        :aria-describedby="isLocked ? 'vehicle-detail-locked' : undefined"
+        :severity="reason ? 'secondary' : undefined"
+        :disabled="Boolean(reason)"
+        :aria-describedby="reason ? 'vehicle-detail-reason' : undefined"
         @click="$emit('book', vehicle.slug)"
       />
       <p
-        v-if="isLocked"
-        id="vehicle-detail-locked"
-        class="vehicle-detail__locked"
+        v-if="reason"
+        id="vehicle-detail-reason"
+        class="vehicle-detail__reason"
       >
-        Complete {{ missingNames.join(' and ') }} first.
+        {{ reason }}
       </p>
       <Message
         v-if="notice"
         class="vehicle-detail__notice"
-        severity="info"
+        severity="success"
       >
         {{ notice }}
       </Message>
@@ -71,6 +71,8 @@ export default defineComponent({
     instructors: {type: Array as PropType<Instructor[]>, required: true},
     /** The courses still to complete before this one can be booked. */
     missingNames: {type: Array as PropType<string[]>, required: true},
+    /** How many more of the course's lessons can be booked. */
+    lessonsLeft: {type: Number, required: true},
     /** A message about booking, shown under the button. */
     notice: {type: String, default: ''},
   },
@@ -80,6 +82,14 @@ export default defineComponent({
   computed: {
     isLocked(): boolean {
       return this.missingNames.length > 0;
+    },
+    /** Why the course cannot be booked, or nothing if it can. */
+    reason(): string {
+      if (this.isLocked) {
+        return `Complete ${this.missingNames.join(' and ')} first.`;
+      }
+
+      return this.lessonsLeft === 0 ? 'You have booked every lesson in this course.' : '';
     },
     instructorNames(): string[] {
       return this.instructors.map((instructor) => instructor.name);
@@ -143,7 +153,7 @@ export default defineComponent({
     }
   }
 
-  &__locked {
+  &__reason {
     margin: 0.5rem 0 0;
     color: var(--app-muted);
   }

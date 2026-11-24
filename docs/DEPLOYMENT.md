@@ -15,6 +15,7 @@ The project has exactly one web app. Registering a web app can also make Firebas
 1. Create a Neon project, e.g. `halo-drivers-ed`: Postgres 18, region **AWS US East 2 (Ohio)**, the closest to `us-central1`. Name the database `halo_drivers_ed`.
 2. Use two roles, so the running API cannot change the schema:
    - **`hde_owner`**: owns the schema and runs migrations. Create it in the Neon console (Roles), or use the owner role Neon created.
+     The migrations also create the `btree_gist` extension, which needs `CREATE` on the database (owners have it).
    - **`hde_app`**: the API's role, reading and writing rows only. Create it with SQL as `hde_owner`, so it does not get Neon's `neon_superuser` membership, **before the first migration**, so the default privileges cover the tables it creates:
 
      Replace `<generated password>` with a URL-safe password, such as the output of `openssl rand -hex 32`, since it also goes into a connection string. Postgres does not generate one.

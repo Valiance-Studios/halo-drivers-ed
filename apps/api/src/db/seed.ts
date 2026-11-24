@@ -1,8 +1,16 @@
 import type {Instructor, Vehicle} from '@hde/shared';
+import type {InstructorAvailability} from '#src/db/availabilityData.ts';
 import type {Database} from '#src/db/client.ts';
 
 import {sql} from 'drizzle-orm';
-import {instructors, instructorVehicles, vehiclePrerequisites, vehicles} from '#src/db/schema.ts';
+import {
+  instructorAvailability,
+  instructors,
+  instructorVehicles,
+  vehiclePrerequisites,
+  vehicles,
+} from '#src/db/schema.ts';
+import {AVAILABILITY} from '#src/db/availabilityData.ts';
 import {INSTRUCTORS, VEHICLES} from '#src/db/catalogData.ts';
 
 /** Takes the excluded (incoming) value of a column in an upsert. */
@@ -14,7 +22,11 @@ const excluded = (column: string) => sql.raw(`excluded.${column}`);
  */
 export async function seedCatalog(
   db: Database,
-  catalog: {vehicles: Vehicle[]; instructors: Instructor[]} = {vehicles: VEHICLES, instructors: INSTRUCTORS},
+  catalog: {vehicles: Vehicle[]; instructors: Instructor[]; availability: InstructorAvailability[]} = {
+    vehicles: VEHICLES,
+    instructors: INSTRUCTORS,
+    availability: AVAILABILITY,
+  },
 ): Promise<void> {
   await db.transaction(async (tx) => {
     await tx
@@ -45,9 +57,10 @@ export async function seedCatalog(
         },
       });
 
-    // The links are replaced outright, so removing one from the data removes it here too.
+    // The links and hours are replaced outright, so removing one from the data removes it here too.
     await tx.delete(vehiclePrerequisites);
     await tx.delete(instructorVehicles);
+    await tx.delete(instructorAvailability);
 
     const prerequisites = catalog.vehicles.flatMap((vehicle) =>
       vehicle.prerequisites.map((prerequisiteSlug) => ({vehicleSlug: vehicle.slug, prerequisiteSlug})),
@@ -66,6 +79,10 @@ export async function seedCatalog(
 
     if (teaching.length > 0) {
       await tx.insert(instructorVehicles).values(teaching);
+    }
+
+    if (catalog.availability.length > 0) {
+      await tx.insert(instructorAvailability).values(catalog.availability);
     }
   });
 }

@@ -31,6 +31,10 @@ export const useCatalogStore = defineStore('catalog', {
       (state) =>
       (slug: string): string =>
         state.vehicles.find((vehicle) => vehicle.slug === slug)?.name ?? slug,
+    instructorName:
+      (state) =>
+      (slug: string): string =>
+        state.instructors.find((instructor) => instructor.slug === slug)?.name ?? slug,
     /** The instructors who teach a vehicle. */
     instructorsFor:
       (state) =>

@@ -33,6 +33,22 @@ const HaloPreset = definePreset(Aura, {
     colorScheme: {light: COLORS, dark: COLORS},
   },
   components: {
+    dialog: {
+      root: {background: 'var(--app-surface)', borderColor: 'var(--app-line)', color: 'var(--app-text)'},
+    },
+    select: {
+      root: {background: 'var(--app-bg)', borderColor: 'var(--app-line)', color: 'var(--app-text)'},
+      overlay: {background: 'var(--app-surface)', borderColor: 'var(--app-line)', color: 'var(--app-text)'},
+      option: {
+        color: 'var(--app-text)',
+        focusBackground: 'var(--app-bg)',
+        focusColor: 'var(--app-text)',
+        selectedBackground: 'var(--app-primary)',
+        selectedColor: 'var(--app-on-primary)',
+        selectedFocusBackground: 'var(--app-primary)',
+        selectedFocusColor: 'var(--app-on-primary)',
+      },
+    },
     tabs: {
       tablist: {background: 'transparent'},
       tab: {activeColor: 'var(--app-text)'},
