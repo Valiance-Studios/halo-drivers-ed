@@ -23,7 +23,10 @@
       :key="vehicle.slug"
       type="button"
       class="vehicle-route__stop"
-      :class="{'vehicle-route__stop--selected': vehicle.slug === selected}"
+      :class="{
+        'vehicle-route__stop--selected': vehicle.slug === selected,
+        'vehicle-route__stop--locked': isLocked(vehicle),
+      }"
       :style="{'--x': `${x * 100}%`, '--y': `${y * 100}%`, '--columns': columns}"
       :aria-pressed="vehicle.slug === selected"
       @click="$emit('select', vehicle.slug)"
@@ -33,12 +36,27 @@
         kind="vehicles"
         :slug="vehicle.slug"
       />
+      <span
+        v-if="isLocked(vehicle)"
+        class="vehicle-route__lock"
+      >
+        <i
+          class="pi pi-lock"
+          aria-hidden="true"
+        />
+      </span>
       <span class="vehicle-route__name">{{ vehicle.name }}</span>
       <span class="vehicle-route__meta">
         <span>{{ domainName(vehicle) }}</span>
         <span>{{ totalHours(vehicle) }}</span>
       </span>
       <span class="vehicle-route__after">{{ afterText(vehicle) }}</span>
+      <span
+        v-if="isLocked(vehicle)"
+        class="visually-hidden"
+      >
+        Locked
+      </span>
     </button>
   </div>
 </template>
@@ -51,11 +69,12 @@ import type {RouteLayout} from '@/utils/routeLayout';
 import {defineComponent} from 'vue';
 import {mapStores} from 'pinia';
 import {useCatalogStore} from '@/stores/catalog';
+import {useProgressStore} from '@/stores/progress';
 import {layoutRoute, ROUTE_HEIGHT, ROUTE_WIDTH} from '@/utils/routeLayout';
 import {domainName, totalHours} from '@/utils/vehicleText';
 import SubjectArt from '@/components/SubjectArt.vue';
 
-/** A faction's vehicles, joined by their prerequisites. On narrow screens, a list. */
+/** A faction's vehicles, joined by their prerequisites. Locked ones can still be selected. On narrow screens, a list. */
 export default defineComponent({
   name: 'VehicleRoute',
   components: {SubjectArt},
@@ -71,7 +90,7 @@ export default defineComponent({
     return {viewBox: `0 0 ${ROUTE_WIDTH} ${ROUTE_HEIGHT}`};
   },
   computed: {
-    ...mapStores(useCatalogStore),
+    ...mapStores(useCatalogStore, useProgressStore),
     layout(): RouteLayout {
       return layoutRoute(this.vehicles, this.faction);
     },
@@ -82,6 +101,9 @@ export default defineComponent({
   methods: {
     domainName,
     totalHours,
+    isLocked(vehicle: Vehicle): boolean {
+      return this.progressStore.missingFor(vehicle).length > 0;
+    },
     afterText(vehicle: Vehicle): string {
       return vehicle.prerequisites.length > 0
         ? `After ${vehicle.prerequisites.map(this.catalogStore.vehicleName).join(', ')}`
@@ -142,6 +164,24 @@ export default defineComponent({
     margin-bottom: 0.625rem;
   }
 
+  &__stop--locked &__art {
+    filter: grayscale(1);
+    opacity: 0.6;
+  }
+
+  &__lock {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    background: var(--app-text);
+    border-radius: 50%;
+    color: var(--app-bg);
+  }
+
   &__name {
     display: block;
     font-family: var(--app-font-display);
@@ -176,7 +216,9 @@ export default defineComponent({
     }
 
     &__stop {
-      position: static;
+      position: relative;
+      top: auto;
+      left: auto;
       width: 100%;
       transform: none;
     }

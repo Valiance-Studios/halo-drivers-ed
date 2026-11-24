@@ -95,7 +95,7 @@ export default defineComponent({
         background: rgb(255 255 255 / 14%);
       }
 
-      &:hover {
+      &:not(:disabled):hover {
         background: rgb(255 255 255 / 24%);
         color: #fff;
       }

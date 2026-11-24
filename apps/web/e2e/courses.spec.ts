@@ -18,6 +18,25 @@ test('shows the selected vehicle', async ({page}) => {
   await expect(page.getByText('6 lessons, 90 min each')).toBeVisible();
 });
 
+test('shows a locked course but does not let the student book it', async ({page}) => {
+  const warthog = page.getByRole('button', {name: /^Warthog.*Locked$/});
+  await expect(warthog.locator('.pi-lock')).toBeVisible();
+  await warthog.click();
+  await expect(page.getByRole('heading', {name: 'Warthog'})).toBeVisible();
+  await expect(page.getByRole('button', {name: 'Book Warthog course'})).toBeDisabled();
+  await expect(page.getByText('Complete Mongoose first.')).toBeVisible();
+});
+
+test('lets the student book a course without prerequisites', async ({page}) => {
+  const mongoose = page.getByRole('button', {name: /^Mongoose/});
+  await expect(mongoose.locator('.pi-lock')).toBeHidden();
+  await page.getByRole('button', {name: 'Book Mongoose course'}).click();
+  await expect(page.getByText('Booking is not available yet.')).toBeVisible();
+
+  await page.getByRole('button', {name: /^Warthog/}).click();
+  await expect(page.getByText('Booking is not available yet.')).toBeHidden();
+});
+
 test('brings the selected vehicle into view on a phone', async ({page}) => {
   await page.setViewportSize({width: 390, height: 844});
   await page.getByRole('button', {name: /^Warthog/}).click();

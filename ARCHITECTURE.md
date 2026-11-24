@@ -57,7 +57,7 @@ flowchart LR
 - **Monorepo** with npm workspaces: `apps/web`, `apps/api`, `packages/shared`.
 - **Web**: Vue 3 (Options API) + TypeScript, PrimeVue 4 (Aura, colored by the app's [theme tokens](#theming); components auto-imported), Pinia, Vue Router, SCSS with BEM class names, self-hosted fonts (Fontsource), Vite (through Vite+).
 - **API**: Node 26 + TypeScript, Hono on `@hono/node-server`, Drizzle ORM and drizzle-kit migrations, `pg`, Firebase Admin SDK (token verification only). Run from source with Node's type stripping in development; bundled with esbuild for the container.
-- **Shared**: the API's request and response types and constants (`@hde/shared`), imported as TypeScript source by both apps.
+- **Shared**: the API's request and response types and constants, and the prerequisite rule (`@hde/shared`), imported as TypeScript source by both apps.
 - **Data**: PostgreSQL 18; Neon in production, Docker Compose locally.
 - **Tests**: Vitest (unit, and database tests against local Postgres), Playwright (E2E against the Auth emulator, a local API and the database).
 - **Tooling**: Vite+ (`vite-plus`), which bundles Vite, Vitest, Oxlint and Oxfmt; configured in the root `vite.config.ts` and `apps/web/vite.config.ts`. ESLint runs only `eslint-plugin-vue`, on Vue components.
@@ -77,7 +77,7 @@ TypeScript is pinned to 6.x: TypeScript 7 (native compiler) does not expose the 
 flowchart TB
     subgraph web["apps/web"]
         views["views/ and components/<br/>(Options API, PrimeVue)"]
-        stores["stores/<br/>auth, catalog, theme"]
+        stores["stores/<br/>auth, catalog, progress, theme"]
         client["services/apiClient.ts<br/>ApiClient + TokenSource"]
         plugins["plugins/<br/>firebase, appCheck, primevue"]
         views --> stores
@@ -95,11 +95,11 @@ flowchart TB
         repos --> db
     end
 
-    shared["packages/shared<br/>types and constants"]
+    shared["packages/shared<br/>types, constants and<br/>the prerequisite rule"]
 
     client -- "HTTP /api" --> app
-    web -. "imports types" .-> shared
-    api -. "imports types" .-> shared
+    web -. "imports" .-> shared
+    api -. "imports types and constants" .-> shared
 ```
 
 The API's routes depend on interfaces (`TokenVerifier`, `CatalogRepository`, `AllowlistRepository`), and `src/server.ts` wires in the Firebase and Postgres implementations. The unit tests pass fakes instead, so they need neither Firebase nor a database.
@@ -226,7 +226,7 @@ The owner's account (role `admin`) sees everything in the backend: all bookings,
 
 - `availability`: each instructor's weekly windows, seeded.
 - `bookings`: student, instructor, vehicle, and a `tstzrange` for the lesson. Exclusion constraints (`btree_gist`) make overlapping bookings for the same instructor, or the same vehicle, impossible. The lesson length comes from the vehicle.
-- Prerequisites: a booking for a vehicle requires its prerequisite courses to be complete (`lessons_required` lessons done).
+- Prerequisites: a booking for a vehicle requires its prerequisite courses to be complete (`lessons_required` lessons done). The API enforces this with `missingPrerequisites` from `@hde/shared`, which the web app already uses for its locks, and serves the student's completed courses to `stores/progress.ts`.
 
 ### Demo Slots for Recruiters
 
@@ -260,6 +260,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - API with App Check and ID token checks, JSON errors, and a config that refuses unsafe settings on Cloud Run.
 - Postgres schema and first migration: vehicles, prerequisites, instructors, who teaches what, allowlist. Seeded catalog of 10 vehicles and 6 instructors.
 - Courses page: vehicles on a route map of their prerequisites, and instructors, by faction.
+- Locks on courses whose prerequisites are not complete, and a book button in the vehicle details (a placeholder until bookings). Completed courses (`stores/progress.ts`) are always empty for now, so only the Mongoose and Ghost are open.
 - UNSC and Covenant themes, each light and dark, with placeholder artwork.
 - Local development with Docker Postgres and the Auth emulator; unit, database and E2E tests.
 - API image, Cloud Build config and deploy script (migrate job, then service).

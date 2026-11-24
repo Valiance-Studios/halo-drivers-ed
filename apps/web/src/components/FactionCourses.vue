@@ -13,6 +13,9 @@
       :vehicle="vehicle"
       :prerequisite-names="vehicle.prerequisites.map(catalogStore.vehicleName)"
       :instructors="catalogStore.instructorsFor(vehicle.slug)"
+      :missing-names="progressStore.missingFor(vehicle).map(catalogStore.vehicleName)"
+      :notice="notice"
+      @book="book"
     />
     <h2 class="faction-courses__heading">Instructors</h2>
     <InstructorList :instructors="catalogStore.instructorsOf(faction)" />
@@ -26,6 +29,7 @@ import type {Faction, Vehicle} from '@hde/shared';
 import {defineComponent} from 'vue';
 import {mapStores} from 'pinia';
 import {useCatalogStore} from '@/stores/catalog';
+import {useProgressStore} from '@/stores/progress';
 import InstructorList from '@/components/InstructorList.vue';
 import VehicleDetail from '@/components/VehicleDetail.vue';
 import VehicleRoute from '@/components/VehicleRoute.vue';
@@ -38,10 +42,10 @@ export default defineComponent({
     faction: {type: String as PropType<Faction>, required: true},
   },
   data() {
-    return {selectedSlug: null as string | null};
+    return {selectedSlug: null as string | null, notice: ''};
   },
   computed: {
-    ...mapStores(useCatalogStore),
+    ...mapStores(useCatalogStore, useProgressStore),
     vehicles(): Vehicle[] {
       return this.catalogStore.vehiclesOf(this.faction);
     },
@@ -51,9 +55,14 @@ export default defineComponent({
     },
   },
   methods: {
+    /** Stands in for the booking flow, which is not built yet. */
+    book() {
+      this.notice = 'Booking is not available yet.';
+    },
     /** Selects a vehicle and brings its course into view, which is off screen on a phone. */
     async select(slug: string) {
       this.selectedSlug = slug;
+      this.notice = '';
       await this.$nextTick();
       const detail = this.$refs.detail as InstanceType<typeof VehicleDetail> | undefined;
       const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;

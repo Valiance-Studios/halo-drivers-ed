@@ -16,6 +16,29 @@
       <p class="vehicle-detail__description">
         {{ vehicle.description }}
       </p>
+      <Button
+        class="vehicle-detail__book"
+        :label="`Book ${vehicle.name} course`"
+        :icon="isLocked ? 'pi pi-lock' : 'pi pi-calendar'"
+        :severity="isLocked ? 'secondary' : undefined"
+        :disabled="isLocked"
+        :aria-describedby="isLocked ? 'vehicle-detail-locked' : undefined"
+        @click="$emit('book', vehicle.slug)"
+      />
+      <p
+        v-if="isLocked"
+        id="vehicle-detail-locked"
+        class="vehicle-detail__locked"
+      >
+        Complete {{ missingNames.join(' and ') }} first.
+      </p>
+      <Message
+        v-if="notice"
+        class="vehicle-detail__notice"
+        severity="info"
+      >
+        {{ notice }}
+      </Message>
     </div>
     <dl class="vehicle-detail__facts">
       <dt>Course</dt>
@@ -38,7 +61,7 @@ import {defineComponent} from 'vue';
 import {totalHours} from '@/utils/vehicleText';
 import SubjectArt from '@/components/SubjectArt.vue';
 
-/** One vehicle's course: what it covers, how long it takes and who teaches it. */
+/** One vehicle's course: what it covers, how long it takes, who teaches it, and booking it. */
 export default defineComponent({
   name: 'VehicleDetail',
   components: {SubjectArt},
@@ -46,8 +69,18 @@ export default defineComponent({
     vehicle: {type: Object as PropType<Vehicle>, required: true},
     prerequisiteNames: {type: Array as PropType<string[]>, required: true},
     instructors: {type: Array as PropType<Instructor[]>, required: true},
+    /** The courses still to complete before this one can be booked. */
+    missingNames: {type: Array as PropType<string[]>, required: true},
+    /** A message about booking, shown under the button. */
+    notice: {type: String, default: ''},
+  },
+  emits: {
+    book: (slug: string) => slug.length > 0,
   },
   computed: {
+    isLocked(): boolean {
+      return this.missingNames.length > 0;
+    },
     instructorNames(): string[] {
       return this.instructors.map((instructor) => instructor.name);
     },
@@ -93,6 +126,30 @@ export default defineComponent({
     max-width: 52ch;
     margin: 0.625rem 0 0;
     font-size: 1.1875rem;
+  }
+
+  &__book {
+    min-height: 2.75rem;
+    margin-top: 1.125rem;
+    border-radius: var(--app-control-radius);
+
+    &.p-button:disabled {
+      background: #8a8a8a;
+      border-color: #8a8a8a;
+      color: #1c1c1c;
+      cursor: not-allowed;
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+
+  &__locked {
+    margin: 0.5rem 0 0;
+    color: var(--app-muted);
+  }
+
+  &__notice {
+    margin-top: 0.75rem;
   }
 
   &__facts {
