@@ -40,6 +40,20 @@ button {
   font-family: inherit;
 }
 
+// PrimeVue's Aura gives these its own emerald and pale gray borders, and an underline.
+.p-button {
+  text-decoration: none;
+
+  &.p-button-outlined:not(.p-button-secondary) {
+    border-color: var(--app-primary);
+  }
+
+  &.p-button-outlined.p-button-secondary {
+    border-color: var(--app-muted);
+    color: var(--app-text);
+  }
+}
+
 // The lines between vehicles: a road with a lane marking (UNSC), or a conduit with a glowing core (Covenant).
 .road {
   fill: none;

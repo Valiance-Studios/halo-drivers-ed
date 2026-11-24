@@ -77,7 +77,7 @@ TypeScript is pinned to 6.x: TypeScript 7 (native compiler) does not expose the 
 flowchart TB
     subgraph web["apps/web"]
         views["views/ and components/<br/>(Options API, PrimeVue)"]
-        stores["stores/<br/>auth, bookings, catalog,<br/>progress, theme"]
+        stores["stores/<br/>auth, bookings, catalog,<br/>progress, theme, viewAs"]
         client["services/apiClient.ts<br/>ApiClient + TokenSource"]
         plugins["plugins/<br/>firebase, appCheck, primevue"]
         views --> stores
@@ -90,13 +90,18 @@ flowchart TB
         verifier["src/auth/tokenVerifier.ts"]
         bookingRoutes["src/http/bookingRoutes.ts"]
         service["src/bookings/<br/>BookingService, findSlots"]
-        repos["src/repositories/<br/>catalog, allowlist, bookings"]
+        lessonRoutes["src/http/lessonRoutes.ts<br/>+ requireAdmin"]
+        lessonService["src/lessons/<br/>LessonService"]
+        repos["src/repositories/<br/>catalog, allowlist, bookings, lessons"]
         db["src/db/<br/>schema, client, migrations, seed"]
         app --> verifier
         app --> repos
         app --> bookingRoutes
         bookingRoutes --> service
         service --> repos
+        app --> lessonRoutes
+        lessonRoutes --> lessonService
+        lessonService --> repos
         repos --> db
     end
 
@@ -107,7 +112,7 @@ flowchart TB
     api -. "imports types and constants" .-> shared
 ```
 
-The API's routes depend on interfaces (`TokenVerifier`, `CatalogRepository`, `AllowlistRepository`, `BookingRepository`), and `src/server.ts` wires in the Firebase and Postgres implementations. The unit tests pass fakes instead, so they need neither Firebase nor a database.
+The API's routes depend on interfaces (`TokenVerifier`, `CatalogRepository`, `AllowlistRepository`, `BookingRepository`, `LessonRepository`), and `src/server.ts` wires in the Firebase and Postgres implementations. The unit tests pass fakes instead, so they need neither Firebase nor a database.
 
 ## Request Authorization
 
@@ -130,7 +135,8 @@ sequenceDiagram
     Note right of A: missing or invalid: 401 unauthenticated
     A->>P: SELECT role FROM allowed_users WHERE email = ?
     Note right of A: no row: 403 not-allowed
-    A->>P: catalog queries
+    Note right of A: /api/admin/** and not an admin: 403 not-admin
+    A->>P: the route's queries
     A-->>B: 200 JSON
 ```
 
@@ -165,6 +171,31 @@ sequenceDiagram
 ```
 
 A lesson can be cancelled until 24 hours before it starts. It counts toward its course when completed, and a missed or cancelled lesson can be booked again. Completed courses are worked out from the bookings (`completedCourses` in `@hde/shared`), by the API to enforce locks and by `stores/progress.ts` to show them.
+
+## Lesson Sign-Off
+
+Each booked lesson has a form: the skills of the first lesson in its course the student has not completed. From when the lesson starts, each mark is saved on its own (`PUT /api/admin/lessons/:id/results/:skillId`), so marks made together do not overwrite each other; `MarkSaver` in the web app sends one skill's marks in order. The lesson is signed off once it ends (`PUT .../sign-off`). The instructors are seeded characters, so admins do this, optionally viewing as one (`?instructor=` on `GET /api/admin/lessons`, a filter rather than another sign-in).
+
+```mermaid
+stateDiagram-v2
+    [*] --> booked
+    booked --> cancelled: student cancels, 24 hours before
+    booked --> booked: skill marked
+    booked --> completed: attended, every skill passed
+    booked --> repeat: attended, some not passed
+    booked --> missed: student missed it
+    completed --> repeat: corrected
+    completed --> missed: corrected
+    repeat --> completed: corrected
+    repeat --> missed: corrected
+    missed --> completed: corrected
+    missed --> repeat: corrected
+```
+
+- Only `completed` counts toward the course. After `repeat`, the next lesson has the same form, with the skills already passed kept.
+- Lessons in a course are signed off in order, and one can be corrected until a later one is signed off.
+- A correction is refused if it would lock a course the student has lessons in, or leave them with more lessons than the course has.
+- `PostgresLessonRepository.update` takes the same lock on the student's `allowed_users` row as booking does, so neither can change what the other decided on.
 
 ## Theming
 
@@ -227,10 +258,34 @@ erDiagram
         timestamptz starts_at
         timestamptz ends_at
         booking_status status
+        int lesson_number FK
+        text signed_off_by
+        timestamptz signed_off_at
         timestamptz created_at
+    }
+    course_lessons {
+        text vehicle_slug PK,FK
+        int number PK
+        text title
+    }
+    lesson_skills {
+        text vehicle_slug PK,FK
+        int lesson_number PK,FK
+        text id PK
+        int position
+        text label
+        boolean active
+    }
+    skill_results {
+        uuid booking_id PK,FK
+        text vehicle_slug FK
+        int lesson_number PK,FK
+        text skill_id PK,FK
+        skill_result result
     }
     allowed_users {
         text email PK
+        text display_name
         role role
         timestamptz created_at
     }
@@ -243,12 +298,20 @@ erDiagram
     allowed_users ||--o{ bookings : "books"
     instructors ||--o{ bookings : "teaches"
     vehicles ||--o{ bookings : "is used in"
+    vehicles ||--o{ course_lessons : "is taught over"
+    course_lessons ||--o{ lesson_skills : "marks"
+    course_lessons |o--o{ bookings : "was given in"
+    bookings ||--o{ skill_results : "has"
+    lesson_skills ||--o{ skill_results : "is marked in"
 ```
 
 - `faction` is an enum (`unsc`, `covenant`). `instructor_vehicles.faction` is part of both foreign keys, to `instructors(slug, faction)` and `vehicles(slug, faction)`, so a mismatch is rejected by Postgres.
-- `allowed_users.email` is stored lowercase (a check constraint enforces it). `role` has only `admin` for now.
+- `allowed_users.email` is stored lowercase (a check constraint enforces it). `role` is `admin` or `student`: both can book, and only admins reach `/api/admin`.
 - `bookings` has three exclusion constraints (migration `0002_booking_exclusions`, using `btree_gist`): a student, an instructor and a vehicle each have one lesson at a time. Cancelled lessons do not count. It references vehicles and instructors with their faction, but not `instructor_vehicles`, which each seed replaces.
 - `instructor_availability` holds wall-clock times in `America/New_York`, seeded from `apps/api/src/db/availabilityData.ts`.
+- `allowed_users.display_name` is the Google account's name, stored by `GET /api/me` at sign-in, so instructors can see who a student is.
+- `course_lessons` and `lesson_skills` are seeded from `apps/api/src/db/curriculumData.ts`. A skill dropped from the data becomes inactive rather than deleted, since results refer to it, so skill ids must not be reused.
+- Checks on `bookings` require a signature on signed-off lessons, and a lesson number on attended ones.
 - The catalog (vehicles, instructors, who teaches what) is seed data in `apps/api/src/db/catalogData.ts`, loaded by `npm run db:seed`. Instructors are seeded characters, not accounts.
 - Schema changes: edit `apps/api/src/db/schema.ts`, run `npm run db:generate`, and commit the new file in `apps/api/drizzle/`.
 
@@ -271,17 +334,6 @@ One image holds both entry points. Migrations and the catalog seed run as their 
 
 Agreed, not built yet. Build these on their own branches.
 
-### Admin Access and "View As"
-
-The owner's account (role `admin`) sees everything in the backend: all bookings, all students and every instructor's schedule. An admin can also **view as** one instructor, which scopes the pages to what that instructor would see, or switch back to viewing everything. Since instructors are seeded characters rather than accounts, "view as" is a filter the API applies for admins, not an impersonated sign-in:
-
-- Admin-only endpoints accept an optional instructor (e.g. `?instructor=master-chief`); without it they return everything. The API ignores or rejects the parameter for other roles.
-- The web app keeps the chosen instructor in a Pinia store, shows it in the header with a way to clear it, and passes it on every request.
-
-### Lesson Sign-Off
-
-An admin viewing as an instructor marks that instructor's past lessons `completed` or `missed`. Until this is built nothing completes a lesson, so locked courses stay locked.
-
 ### Demo Slots for Recruiters
 
 Self-serve, no code to request:
@@ -302,6 +354,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 | Application layers | [Application Layers](#application-layers) | Folders under `apps/*/src`, `packages/shared`, `apps/api/src/server.ts` |
 | Request authorization | [Request Authorization](#request-authorization) | `apps/api/src/app.ts`, `apps/api/src/config.ts`, `apps/web/src/services/apiClient.ts`, `apps/web/src/stores/auth.ts` |
 | Booking | [Booking](#booking) | `apps/api/src/bookings/`, `apps/api/src/http/bookingRoutes.ts`, `apps/api/src/repositories/bookingRepository.ts`, `packages/shared/src/bookings.ts` |
+| Lesson sign-off | [Lesson Sign-Off](#lesson-sign-off) | `apps/api/src/lessons/`, `apps/api/src/http/lessonRoutes.ts`, `apps/api/src/repositories/lessonRepository.ts`, `packages/shared/src/curriculum.ts` |
 | Theming | [Theming](#theming) | `apps/web/src/stores/theme.ts`, `apps/web/src/utils/themePreference.ts`, `apps/web/src/styles/themes.scss`, `apps/web/src/plugins/primevue.ts`, `FactionToggle.vue`, `ThemeToggle.vue` |
 | Tables | [Data Model](#data-model) | `apps/api/src/db/schema.ts`, `apps/api/drizzle/` |
 | Deploy pipeline | [Deployment](#deployment) | `scripts/deploy-api.ts`, `apps/api/Dockerfile`, `apps/api/cloudbuild.yaml`, `firebase.json` |
@@ -317,6 +370,8 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - Courses page: vehicles on a route map of their prerequisites, and instructors, by faction.
 - Locks on courses whose prerequisites are not complete, enforced by the API.
 - Booking: instructor hours, lesson times, booking and cancelling, My lessons, and exclusion constraints against double-booking.
+- Lesson plans (53 lessons), instructors' lesson forms, sign-off that unlocks courses, and admins' schedule with View As.
+- A `student` role, which can book but not sign off.
 - UNSC and Covenant themes, each light and dark, with placeholder artwork.
 - Local development with Docker Postgres and the Auth emulator; unit, database and E2E tests.
 - API image, Cloud Build config and deploy script (migrate job, then service).
@@ -331,7 +386,5 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### Next: Features
 
-1. Lesson sign-off, so completed lessons unlock courses.
-2. Admin "View As" an instructor, or everything.
-3. Demo slots for recruiters.
-4. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. See [Artwork](docs/UI.md#artwork).
+1. Demo slots for recruiters, with some lessons already completed so a course can be seen unlocking.
+2. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. See [Artwork](docs/UI.md#artwork).

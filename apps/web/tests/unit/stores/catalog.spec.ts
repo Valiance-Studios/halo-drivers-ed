@@ -4,7 +4,7 @@ import {beforeEach, describe, expect, it, vi} from 'vite-plus/test';
 import {createPinia, setActivePinia} from 'pinia';
 import {useCatalogStore} from '@/stores/catalog';
 
-const mocks = vi.hoisted(() => ({listVehicles: vi.fn(), listInstructors: vi.fn()}));
+const mocks = vi.hoisted(() => ({listVehicles: vi.fn(), listInstructors: vi.fn(), listCurriculum: vi.fn()}));
 
 vi.mock('@/services/api', () => ({api: mocks}));
 
@@ -29,6 +29,7 @@ describe('catalog store', () => {
     vi.clearAllMocks();
     mocks.listVehicles.mockResolvedValue(VEHICLES);
     mocks.listInstructors.mockResolvedValue(INSTRUCTORS);
+    mocks.listCurriculum.mockResolvedValue([]);
   });
 
   it('loads once and groups by faction', async () => {

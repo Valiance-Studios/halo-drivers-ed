@@ -25,6 +25,7 @@ const lesson = (vehicleSlug: string, status: BookingStatus): Booking => ({
   startsAt: '2026-06-08T12:00:00.000Z',
   endsAt: '2026-06-08T13:00:00.000Z',
   status,
+  lessonNumber: null,
 });
 const FIRST = vehicle('first');
 const SECOND = vehicle('second', 'first');
@@ -51,9 +52,9 @@ describe('progress store', () => {
     expect(store.missingFor(SECOND)).toEqual([]);
   });
 
-  it('counts booked and completed lessons, but not cancelled or missed ones', () => {
+  it('counts booked and completed lessons, but not cancelled, missed or repeated ones', () => {
     const store = useProgressStore();
-    useBookingsStore().bookings = [lesson('first', 'cancelled'), lesson('first', 'missed')];
+    useBookingsStore().bookings = [lesson('first', 'cancelled'), lesson('first', 'missed'), lesson('first', 'repeat')];
     expect(store.lessonsLeft(FIRST)).toBe(2);
 
     useBookingsStore().bookings = [lesson('first', 'completed'), lesson('first', 'booked')];

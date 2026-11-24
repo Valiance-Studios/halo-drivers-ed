@@ -233,7 +233,6 @@ export default defineComponent({
 
     .p-button {
       min-height: 2.75rem;
-      border-color: var(--app-primary);
     }
   }
 }

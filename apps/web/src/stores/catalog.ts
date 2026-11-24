@@ -1,4 +1,4 @@
-import type {Faction, Instructor, Vehicle} from '@hde/shared';
+import type {CourseLesson, Faction, Instructor, Vehicle} from '@hde/shared';
 
 import {defineStore} from 'pinia';
 import {api} from '@/services/api';
@@ -6,6 +6,7 @@ import {api} from '@/services/api';
 export interface CatalogState {
   vehicles: Vehicle[];
   instructors: Instructor[];
+  curriculum: CourseLesson[];
   loading: boolean;
   errorMessage: string | null;
 }
@@ -15,6 +16,7 @@ export const useCatalogStore = defineStore('catalog', {
   state: (): CatalogState => ({
     vehicles: [],
     instructors: [],
+    curriculum: [],
     loading: false,
     errorMessage: null,
   }),
@@ -27,6 +29,11 @@ export const useCatalogStore = defineStore('catalog', {
       (state) =>
       (faction: Faction): Instructor[] =>
         state.instructors.filter((instructor) => instructor.faction === faction),
+    /** A course's lessons, in order. */
+    lessonsOf:
+      (state) =>
+      (vehicleSlug: string): CourseLesson[] =>
+        state.curriculum.filter((lesson) => lesson.vehicleSlug === vehicleSlug),
     vehicleName:
       (state) =>
       (slug: string): string =>
@@ -51,7 +58,11 @@ export const useCatalogStore = defineStore('catalog', {
       this.errorMessage = null;
 
       try {
-        [this.vehicles, this.instructors] = await Promise.all([api.listVehicles(), api.listInstructors()]);
+        [this.vehicles, this.instructors, this.curriculum] = await Promise.all([
+          api.listVehicles(),
+          api.listInstructors(),
+          api.listCurriculum(),
+        ]);
       } catch (error) {
         this.errorMessage = `Could not load the courses: ${error instanceof Error ? error.message : 'unknown error'}`;
       } finally {

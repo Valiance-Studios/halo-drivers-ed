@@ -51,7 +51,7 @@ Conventions are in [CLAUDE.md](../CLAUDE.md#environment-files). In short:
 | `npm run test:e2e` | Playwright. Starts its own Auth emulator, API (port 8082, `halo_drivers_ed_e2e` database, recreated each run) and Vite (5174). Needs `npm run db:up`. |
 | `npm run db:generate` | Writes a migration for changes to `apps/api/src/db/schema.ts`. |
 | `npm run db:migrate` / `db:seed` | Applies migrations / loads the catalog, on `DATABASE_URL` (local by default). |
-| `npm run db:allow -- <email> [role]` | Allowlists an account (role defaults to `admin`). |
+| `npm run db:allow -- <email> [role]` | Allowlists an account as `admin` (the default) or `student`, or changes its role. Give students `student`: admins see and sign off everyone's lessons. |
 | `npm run deploy:api` / `deploy:web` | See [DEPLOYMENT.md](DEPLOYMENT.md). |
 
 ## Tests

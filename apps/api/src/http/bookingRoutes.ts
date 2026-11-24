@@ -4,8 +4,7 @@ import type {SignedInEnv} from '#src/http/signedIn.ts';
 
 import {Hono} from 'hono';
 import {ApiError} from '#src/http/errors.ts';
-
-const UUID = /^[\da-f]{8}(-[\da-f]{4}){3}-[\da-f]{12}$/i;
+import {lessonId} from '#src/http/lessonId.ts';
 
 /** Checks a request's JSON body, which could hold anything. */
 function parseBookingRequest(body: unknown): BookingRequest {
@@ -38,12 +37,6 @@ export function bookingRoutes(service: BookingService): Hono<SignedInEnv> {
       return c.json(await service.book(c.var.me.email, request), 201);
     })
     .post('/bookings/:id/cancel', async (c) => {
-      const id = c.req.param('id');
-
-      if (!UUID.test(id)) {
-        throw new ApiError(404, 'not-found', 'No such lesson.');
-      }
-
-      return c.json(await service.cancel(c.var.me.email, id));
+      return c.json(await service.cancel(c.var.me.email, lessonId(c.req.param('id'))));
     });
 }
