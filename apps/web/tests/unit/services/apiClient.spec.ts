@@ -24,6 +24,23 @@ describe('ApiClient', () => {
     });
   });
 
+  it('posts JSON', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(201, {}));
+    const request = {vehicleSlug: 'ghost', instructorSlug: 'arbiter', startsAt: '2026-06-08T12:00:00.000Z'};
+    await new ApiClient(tokens, '/api', fetchImpl).createBooking(request);
+
+    expect(fetchImpl).toHaveBeenCalledWith('/api/bookings', {
+      method: 'POST',
+      body: JSON.stringify(request),
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer id-token',
+        'Content-Type': 'application/json',
+        'X-Firebase-AppCheck': 'app-check-token',
+      },
+    });
+  });
+
   it('leaves out tokens it does not have', async () => {
     const fetchImpl = vi.fn(async () => jsonResponse(200, []));
     await new ApiClient({idToken: async () => null, appCheckToken: async () => null}, '/api', fetchImpl).listVehicles();

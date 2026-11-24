@@ -25,6 +25,24 @@
           </svg>
           Halo Drivers Ed
         </RouterLink>
+        <nav
+          v-if="authStore.isAllowed"
+          class="app__nav"
+          aria-label="Main"
+        >
+          <RouterLink
+            class="app__link"
+            :to="{name: 'courses'}"
+          >
+            Courses
+          </RouterLink>
+          <RouterLink
+            class="app__link"
+            :to="{name: 'lessons'}"
+          >
+            My lessons
+          </RouterLink>
+        </nav>
         <div class="app__actions">
           <FactionToggle />
           <ThemeToggle />
@@ -51,6 +69,7 @@
 import {defineComponent} from 'vue';
 import {mapStores} from 'pinia';
 import {useAuthStore} from '@/stores/auth';
+import {useBookingsStore} from '@/stores/bookings';
 import FactionToggle from '@/components/FactionToggle.vue';
 import ThemeToggle from '@/components/ThemeToggle.vue';
 
@@ -58,9 +77,13 @@ export default defineComponent({
   name: 'App',
   components: {FactionToggle, ThemeToggle},
   computed: {
-    ...mapStores(useAuthStore),
+    ...mapStores(useAuthStore, useBookingsStore),
   },
   watch: {
+    /** Forgets one account's lessons before another signs in. */
+    'authStore.user.uid'() {
+      this.bookingsStore.$reset();
+    },
     'authStore.isAllowed'(isAllowed: boolean) {
       if (!isAllowed && !this.$route.meta.public) {
         void this.$router.push({name: 'login'});
@@ -130,6 +153,36 @@ export default defineComponent({
     &:focus-visible {
       outline: 2px solid #fff;
       outline-offset: 4px;
+    }
+  }
+
+  &__nav {
+    display: flex;
+    gap: 1.25rem;
+    margin-right: auto;
+    margin-left: 1rem;
+
+    @media (max-width: 52rem) {
+      order: 1;
+      width: 100%;
+      margin: 0;
+    }
+  }
+
+  &__link {
+    padding: 0.5rem 0;
+    border-bottom: 3px solid transparent;
+    color: inherit;
+    text-decoration: none;
+
+    &:hover,
+    &.router-link-active {
+      border-color: currentcolor;
+    }
+
+    &:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 2px;
     }
   }
 

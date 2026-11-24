@@ -7,7 +7,18 @@ export interface ApiErrorBody {
   };
 }
 
-export const API_ERROR_CODES = ['unauthenticated', 'app-check-failed', 'not-allowed', 'not-found', 'internal'] as const;
+export const API_ERROR_CODES = [
+  'unauthenticated',
+  'app-check-failed',
+  'not-allowed',
+  'not-found',
+  'invalid-request',
+  'course-locked',
+  'no-lessons-left',
+  'slot-unavailable',
+  'too-late-to-cancel',
+  'internal',
+] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 
 /** The header that carries the App Check token, as Firebase's own services expect it. */

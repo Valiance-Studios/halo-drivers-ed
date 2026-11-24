@@ -1,9 +1,11 @@
-import type {Instructor, Role, Vehicle} from '@hde/shared';
+import type {Booking, Instructor, Role, Vehicle} from '@hde/shared';
 import type {AppDependencies} from '#src/app.ts';
 import type {TokenVerifier} from '#src/auth/tokenVerifier.ts';
+import type {BookingRepository} from '#src/repositories/bookingRepository.ts';
 
 import {describe, expect, it, vi} from 'vite-plus/test';
 import {createApp} from '#src/app.ts';
+import {BookingService} from '#src/bookings/bookingService.ts';
 
 const VEHICLE: Vehicle = {
   slug: 'warthog',
@@ -23,6 +25,25 @@ const INSTRUCTOR: Instructor = {
   bio: '',
   vehicles: ['warthog'],
 };
+
+const BOOKING: Booking = {
+  id: '0b0e7c1e-3f0a-4c55-9f5e-0d1f6f0a7c11',
+  vehicleSlug: 'warthog',
+  instructorSlug: 'sergeant-johnson',
+  startsAt: '2026-06-09T12:00:00.000Z',
+  endsAt: '2026-06-09T13:00:00.000Z',
+  status: 'booked',
+};
+
+/** Holds one lesson, which belongs to pat@example.com. */
+const bookingRepository: BookingRepository = {
+  listForStudent: async (email) => (email === 'pat@example.com' ? [BOOKING] : []),
+  listAvailability: async () => [],
+  listBusy: async () => [],
+  create: async () => null,
+  cancel: async () => null,
+};
+const catalog = {listVehicles: async () => [VEHICLE], listInstructors: async () => [INSTRUCTOR]};
 
 /** Accepts the ID token "valid-<email>" and the App Check token "app". */
 const verifier: TokenVerifier = {
@@ -47,7 +68,8 @@ function makeApp(overrides: Partial<AppDependencies> = {}) {
     appCheck: 'required',
     verifier,
     allowlist: {findRole: vi.fn(async (email: string) => roles[email.toLowerCase()] ?? null)},
-    catalog: {listVehicles: async () => [VEHICLE], listInstructors: async () => [INSTRUCTOR]},
+    catalog,
+    bookings: new BookingService(bookingRepository, catalog),
     ...overrides,
   });
 }
@@ -109,6 +131,30 @@ describe('API', () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({error: {code: 'not-allowed'}});
+  });
+
+  it("lists the signed-in student's lessons", async () => {
+    expect(await (await get(makeApp(), '/api/bookings', SIGNED_IN)).json()).toEqual([BOOKING]);
+  });
+
+  it.each(['/api/bookings', '/api/slots'])('needs a signed-in account for %s', async (path) => {
+    expect((await get(makeApp(), path, {'X-Firebase-AppCheck': 'app'})).status).toBe(401);
+  });
+
+  it.each(['not json', '{}', '{"vehicleSlug":"warthog","instructorSlug":"sergeant-johnson","startsAt":"soon"}'])(
+    'rejects the booking request %s',
+    async (body) => {
+      const response = await makeApp().request('/api/bookings', {method: 'POST', headers: SIGNED_IN, body});
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({error: {code: 'invalid-request'}});
+    },
+  );
+
+  it.each(['not-a-uuid', BOOKING.id])('answers cancelling an unknown lesson (%s) with a 404', async (id) => {
+    const response = await makeApp().request(`/api/bookings/${id}/cancel`, {method: 'POST', headers: SIGNED_IN});
+
+    expect(response.status).toBe(404);
   });
 
   it('answers unknown endpoints with a JSON 404', async () => {

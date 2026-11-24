@@ -1,0 +1,567 @@
+{
+  "id": "40e16bd6-22c4-4815-87b0-ce318f3679ff",
+  "prevId": "dbe22ce3-54c0-4314-a624-917192d78f06",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.allowed_users": {
+      "name": "allowed_users",
+      "schema": "",
+      "columns": {
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "allowed_users_email_lowercase": {
+          "name": "allowed_users_email_lowercase",
+          "value": "\"allowed_users\".\"email\" = lower(\"allowed_users\".\"email\")"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.bookings": {
+      "name": "bookings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "student_email": {
+          "name": "student_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "instructor_slug": {
+          "name": "instructor_slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vehicle_slug": {
+          "name": "vehicle_slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "faction": {
+          "name": "faction",
+          "type": "faction",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "booking_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'booked'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "bookings_student_idx": {
+          "name": "bookings_student_idx",
+          "columns": [
+            {
+              "expression": "student_email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "starts_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "bookings_student_email_allowed_users_email_fk": {
+          "name": "bookings_student_email_allowed_users_email_fk",
+          "tableFrom": "bookings",
+          "columnsFrom": [
+            "student_email"
+          ],
+          "tableTo": "allowed_users",
+          "columnsTo": [
+            "email"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "bookings_instructor_fkey": {
+          "name": "bookings_instructor_fkey",
+          "tableFrom": "bookings",
+          "columnsFrom": [
+            "instructor_slug",
+            "faction"
+          ],
+          "tableTo": "instructors",
+          "columnsTo": [
+            "slug",
+            "faction"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "bookings_vehicle_fkey": {
+          "name": "bookings_vehicle_fkey",
+          "tableFrom": "bookings",
+          "columnsFrom": [
+            "vehicle_slug",
+            "faction"
+          ],
+          "tableTo": "vehicles",
+          "columnsTo": [
+            "slug",
+            "faction"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "bookings_order": {
+          "name": "bookings_order",
+          "value": "\"bookings\".\"starts_at\" < \"bookings\".\"ends_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.instructor_availability": {
+      "name": "instructor_availability",
+      "schema": "",
+      "columns": {
+        "instructor_slug": {
+          "name": "instructor_slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "weekday": {
+          "name": "weekday",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "time(0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "time(0)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "instructor_availability_instructor_slug_instructors_slug_fk": {
+          "name": "instructor_availability_instructor_slug_instructors_slug_fk",
+          "tableFrom": "instructor_availability",
+          "columnsFrom": [
+            "instructor_slug"
+          ],
+          "tableTo": "instructors",
+          "columnsTo": [
+            "slug"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {
+        "instructor_availability_instructor_slug_weekday_starts_at_pk": {
+          "name": "instructor_availability_instructor_slug_weekday_starts_at_pk",
+          "columns": [
+            "instructor_slug",
+            "weekday",
+            "starts_at"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "instructor_availability_weekday": {
+          "name": "instructor_availability_weekday",
+          "value": "\"instructor_availability\".\"weekday\" between 1 and 7"
+        },
+        "instructor_availability_order": {
+          "name": "instructor_availability_order",
+          "value": "\"instructor_availability\".\"starts_at\" < \"instructor_availability\".\"ends_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.instructor_vehicles": {
+      "name": "instructor_vehicles",
+      "schema": "",
+      "columns": {
+        "instructor_slug": {
+          "name": "instructor_slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vehicle_slug": {
+          "name": "vehicle_slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "faction": {
+          "name": "faction",
+          "type": "faction",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "instructor_vehicles_instructor_fkey": {
+          "name": "instructor_vehicles_instructor_fkey",
+          "tableFrom": "instructor_vehicles",
+          "columnsFrom": [
+            "instructor_slug",
+            "faction"
+          ],
+          "tableTo": "instructors",
+          "columnsTo": [
+            "slug",
+            "faction"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "instructor_vehicles_vehicle_fkey": {
+          "name": "instructor_vehicles_vehicle_fkey",
+          "tableFrom": "instructor_vehicles",
+          "columnsFrom": [
+            "vehicle_slug",
+            "faction"
+          ],
+          "tableTo": "vehicles",
+          "columnsTo": [
+            "slug",
+            "faction"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {
+        "instructor_vehicles_instructor_slug_vehicle_slug_pk": {
+          "name": "instructor_vehicles_instructor_slug_vehicle_slug_pk",
+          "columns": [
+            "instructor_slug",
+            "vehicle_slug"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.instructors": {
+      "name": "instructors",
+      "schema": "",
+      "columns": {
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "faction": {
+          "name": "faction",
+          "type": "faction",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bio": {
+          "name": "bio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "instructors_slug_faction_key": {
+          "name": "instructors_slug_faction_key",
+          "columns": [
+            "slug",
+            "faction"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.vehicle_prerequisites": {
+      "name": "vehicle_prerequisites",
+      "schema": "",
+      "columns": {
+        "vehicle_slug": {
+          "name": "vehicle_slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prerequisite_slug": {
+          "name": "prerequisite_slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "vehicle_prerequisites_vehicle_slug_vehicles_slug_fk": {
+          "name": "vehicle_prerequisites_vehicle_slug_vehicles_slug_fk",
+          "tableFrom": "vehicle_prerequisites",
+          "columnsFrom": [
+            "vehicle_slug"
+          ],
+          "tableTo": "vehicles",
+          "columnsTo": [
+            "slug"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "vehicle_prerequisites_prerequisite_slug_vehicles_slug_fk": {
+          "name": "vehicle_prerequisites_prerequisite_slug_vehicles_slug_fk",
+          "tableFrom": "vehicle_prerequisites",
+          "columnsFrom": [
+            "prerequisite_slug"
+          ],
+          "tableTo": "vehicles",
+          "columnsTo": [
+            "slug"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {
+        "vehicle_prerequisites_vehicle_slug_prerequisite_slug_pk": {
+          "name": "vehicle_prerequisites_vehicle_slug_prerequisite_slug_pk",
+          "columns": [
+            "vehicle_slug",
+            "prerequisite_slug"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "vehicle_prerequisites_not_self": {
+          "name": "vehicle_prerequisites_not_self",
+          "value": "\"vehicle_prerequisites\".\"vehicle_slug\" <> \"vehicle_prerequisites\".\"prerequisite_slug\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.vehicles": {
+      "name": "vehicles",
+      "schema": "",
+      "columns": {
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "faction": {
+          "name": "faction",
+          "type": "faction",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "domain": {
+          "name": "domain",
+          "type": "vehicle_domain",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lesson_minutes": {
+          "name": "lesson_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lessons_required": {
+          "name": "lessons_required",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "vehicles_slug_faction_key": {
+          "name": "vehicles_slug_faction_key",
+          "columns": [
+            "slug",
+            "faction"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "vehicles_lesson_minutes_positive": {
+          "name": "vehicles_lesson_minutes_positive",
+          "value": "\"vehicles\".\"lesson_minutes\" > 0"
+        },
+        "vehicles_lessons_required_positive": {
+          "name": "vehicles_lessons_required_positive",
+          "value": "\"vehicles\".\"lessons_required\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.booking_status": {
+      "name": "booking_status",
+      "schema": "public",
+      "values": [
+        "booked",
+        "completed",
+        "missed",
+        "cancelled"
+      ]
+    },
+    "public.faction": {
+      "name": "faction",
+      "schema": "public",
+      "values": [
+        "unsc",
+        "covenant"
+      ]
+    },
+    "public.role": {
+      "name": "role",
+      "schema": "public",
+      "values": [
+        "admin"
+      ]
+    },
+    "public.vehicle_domain": {
+      "name": "vehicle_domain",
+      "schema": "public",
+      "values": [
+        "ground",
+        "air"
+      ]
+    }
+  },
+  "schemas": {},
+  "views": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

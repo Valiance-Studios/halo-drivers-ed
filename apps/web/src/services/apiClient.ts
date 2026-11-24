@@ -1,4 +1,13 @@
-import type {ApiErrorBody, ApiErrorCode, Instructor, Me, Vehicle} from '@hde/shared';
+import type {
+  ApiErrorBody,
+  ApiErrorCode,
+  Booking,
+  BookingRequest,
+  Instructor,
+  LessonSlot,
+  Me,
+  Vehicle,
+} from '@hde/shared';
 
 import {APP_CHECK_HEADER} from '@hde/shared';
 
@@ -48,7 +57,33 @@ export class ApiClient {
     return this.get('/instructors');
   }
 
-  private async get<T>(path: string): Promise<T> {
+  listSlots(vehicleSlug: string, instructorSlug: string): Promise<LessonSlot[]> {
+    const query = new URLSearchParams({vehicle: vehicleSlug, instructor: instructorSlug});
+
+    return this.get(`/slots?${query}`);
+  }
+
+  listBookings(): Promise<Booking[]> {
+    return this.get('/bookings');
+  }
+
+  createBooking(request: BookingRequest): Promise<Booking> {
+    return this.post('/bookings', request);
+  }
+
+  cancelBooking(id: string): Promise<Booking> {
+    return this.post(`/bookings/${encodeURIComponent(id)}/cancel`);
+  }
+
+  private get<T>(path: string): Promise<T> {
+    return this.send(path);
+  }
+
+  private post<T>(path: string, body: unknown = {}): Promise<T> {
+    return this.send(path, {method: 'POST', body: JSON.stringify(body)});
+  }
+
+  private async send<T>(path: string, init: {method?: string; body?: string} = {}): Promise<T> {
     const [idToken, appCheckToken] = await Promise.all([this.tokens.idToken(), this.tokens.appCheckToken()]);
     const headers: Record<string, string> = {Accept: 'application/json'};
 
@@ -60,7 +95,11 @@ export class ApiClient {
       headers[APP_CHECK_HEADER] = appCheckToken;
     }
 
-    const response = await this.fetchImpl(`${this.baseUrl}${path}`, {headers});
+    if (init.body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    const response = await this.fetchImpl(`${this.baseUrl}${path}`, {...init, headers});
     const body: unknown = await response.json().catch(() => null);
 
     if (!response.ok) {

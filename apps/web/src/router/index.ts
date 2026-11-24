@@ -13,6 +13,7 @@ const router = createRouter({
     {path: '/', redirect: {name: 'courses'}},
     {path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: {public: true}},
     {path: '/courses', name: 'courses', component: () => import('@/views/CoursesView.vue')},
+    {path: '/lessons', name: 'lessons', component: () => import('@/views/LessonsView.vue')},
     {path: '/:pathMatch(.*)*', redirect: {name: 'courses'}},
   ],
 });

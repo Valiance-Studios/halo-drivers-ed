@@ -57,7 +57,7 @@ flowchart LR
 - **Monorepo** with npm workspaces: `apps/web`, `apps/api`, `packages/shared`.
 - **Web**: Vue 3 (Options API) + TypeScript, PrimeVue 4 (Aura, colored by the app's [theme tokens](#theming); components auto-imported), Pinia, Vue Router, SCSS with BEM class names, self-hosted fonts (Fontsource), Vite (through Vite+).
 - **API**: Node 26 + TypeScript, Hono on `@hono/node-server`, Drizzle ORM and drizzle-kit migrations, `pg`, Firebase Admin SDK (token verification only). Run from source with Node's type stripping in development; bundled with esbuild for the container.
-- **Shared**: the API's request and response types and constants, and the prerequisite rule (`@hde/shared`), imported as TypeScript source by both apps.
+- **Shared**: the API's request and response types and constants, and the booking rules both apps apply (`@hde/shared`), imported as TypeScript source by both apps.
 - **Data**: PostgreSQL 18; Neon in production, Docker Compose locally.
 - **Tests**: Vitest (unit, and database tests against local Postgres), Playwright (E2E against the Auth emulator, a local API and the database).
 - **Tooling**: Vite+ (`vite-plus`), which bundles Vite, Vitest, Oxlint and Oxfmt; configured in the root `vite.config.ts` and `apps/web/vite.config.ts`. ESLint runs only `eslint-plugin-vue`, on Vue components.
@@ -69,7 +69,7 @@ TypeScript is pinned to 6.x: TypeScript 7 (native compiler) does not expose the 
 - **Neon instead of Cloud SQL.** Cloud SQL never scales to zero (about $10 a month idle). Neon's free tier (100 compute hours and 1 GB per project) suspends after 5 idle minutes, which suits a portfolio app; the first request after a pause takes about half a second longer. Moving to Cloud SQL later only changes the connection strings. Postgres cannot run on Cloud Run itself: its disk is not persistent.
 - **One Cloud Run service, not a function per endpoint.** Bookings need transactions and a connection pool; a long-lived service with its own pool fits that better, and it still scales to zero.
 - **Hosting rewrite instead of a separate API domain.** Same origin, so no CORS, and one domain for the API key and reCAPTCHA restrictions. The service allows unauthenticated invocation because Hosting calls it without IAM credentials; the API's own checks protect it.
-- **Postgres constraints over application checks.** Rules that must never break live in the database: an instructor can only teach their own faction's vehicles (composite foreign keys), and bookings will use an exclusion constraint against double-booking.
+- **Postgres constraints over application checks.** Rules that must never break live in the database: an instructor can only teach their own faction's vehicles (composite foreign keys), and exclusion constraints prevent double-booking.
 
 ## Application Layers
 
@@ -77,7 +77,7 @@ TypeScript is pinned to 6.x: TypeScript 7 (native compiler) does not expose the 
 flowchart TB
     subgraph web["apps/web"]
         views["views/ and components/<br/>(Options API, PrimeVue)"]
-        stores["stores/<br/>auth, catalog, progress, theme"]
+        stores["stores/<br/>auth, bookings, catalog,<br/>progress, theme"]
         client["services/apiClient.ts<br/>ApiClient + TokenSource"]
         plugins["plugins/<br/>firebase, appCheck, primevue"]
         views --> stores
@@ -88,21 +88,26 @@ flowchart TB
     subgraph api["apps/api"]
         app["src/app.ts<br/>routes + requireSignedIn"]
         verifier["src/auth/tokenVerifier.ts"]
-        repos["src/repositories/<br/>catalog, allowlist"]
+        bookingRoutes["src/http/bookingRoutes.ts"]
+        service["src/bookings/<br/>BookingService, findSlots"]
+        repos["src/repositories/<br/>catalog, allowlist, bookings"]
         db["src/db/<br/>schema, client, migrations, seed"]
         app --> verifier
         app --> repos
+        app --> bookingRoutes
+        bookingRoutes --> service
+        service --> repos
         repos --> db
     end
 
-    shared["packages/shared<br/>types, constants and<br/>the prerequisite rule"]
+    shared["packages/shared<br/>types, constants and<br/>the booking rules"]
 
     client -- "HTTP /api" --> app
     web -. "imports" .-> shared
     api -. "imports types and constants" .-> shared
 ```
 
-The API's routes depend on interfaces (`TokenVerifier`, `CatalogRepository`, `AllowlistRepository`), and `src/server.ts` wires in the Firebase and Postgres implementations. The unit tests pass fakes instead, so they need neither Firebase nor a database.
+The API's routes depend on interfaces (`TokenVerifier`, `CatalogRepository`, `AllowlistRepository`, `BookingRepository`), and `src/server.ts` wires in the Firebase and Postgres implementations. The unit tests pass fakes instead, so they need neither Firebase nor a database.
 
 ## Request Authorization
 
@@ -132,6 +137,34 @@ sequenceDiagram
 `APP_CHECK=off` exists only for the emulators. `loadConfig` refuses to start on Cloud Run (`K_SERVICE` set) with App Check off or with `FIREBASE_AUTH_EMULATOR_HOST` set, since either would let anyone in.
 
 On the web side, `stores/auth.ts` calls `GET /api/me` after each Google sign-in. A `not-allowed` answer signs the account out with a message on the login page; other failures keep it signed in so a retry can succeed. The popup and the auth listener share one check.
+
+## Booking
+
+`GET /api/slots` offers times from the instructor's hours, half an hour apart, for the next 14 days, leaving out any that clash with a lesson of the student, instructor or vehicle. `POST /api/bookings` checks the time is still offered, then books it in a transaction. The student's `allowed_users` row is locked for the prerequisite and lesson-count checks, so two requests cannot both pass them; the exclusion constraints settle races between students.
+
+```mermaid
+sequenceDiagram
+    participant D as BookingDialog
+    participant S as BookingService
+    participant R as PostgresBookingRepository
+    participant P as Postgres
+
+    D->>S: POST /api/bookings
+    S->>R: listAvailability, listBusy
+    S->>S: findSlots
+    Note right of S: not offered: 409 slot-unavailable
+    S->>R: create(booking, check)
+    R->>P: BEGIN, SELECT allowed_users FOR UPDATE
+    R->>P: SELECT the student's bookings
+    R->>S: check(existing)
+    Note right of S: 409 course-locked or no-lessons-left
+    R->>P: INSERT INTO bookings
+    Note right of P: overlap (23P01): 409 slot-unavailable
+    R->>P: COMMIT
+    S-->>D: 201 Booking
+```
+
+A lesson can be cancelled until 24 hours before it starts. It counts toward its course when completed, and a missed or cancelled lesson can be booked again. Completed courses are worked out from the bookings (`completedCourses` in `@hde/shared`), by the API to enforce locks and by `stores/progress.ts` to show them.
 
 ## Theming
 
@@ -179,6 +212,23 @@ erDiagram
         text vehicle_slug PK,FK
         faction faction FK
     }
+    instructor_availability {
+        text instructor_slug PK,FK
+        int weekday PK
+        time starts_at PK
+        time ends_at
+    }
+    bookings {
+        uuid id PK
+        text student_email FK
+        text instructor_slug FK
+        text vehicle_slug FK
+        faction faction FK
+        timestamptz starts_at
+        timestamptz ends_at
+        booking_status status
+        timestamptz created_at
+    }
     allowed_users {
         text email PK
         role role
@@ -189,10 +239,16 @@ erDiagram
     vehicles ||--o{ vehicle_prerequisites : "is required by"
     instructors ||--o{ instructor_vehicles : "teaches"
     vehicles ||--o{ instructor_vehicles : "is taught in"
+    instructors ||--o{ instructor_availability : "teaches during"
+    allowed_users ||--o{ bookings : "books"
+    instructors ||--o{ bookings : "teaches"
+    vehicles ||--o{ bookings : "is used in"
 ```
 
 - `faction` is an enum (`unsc`, `covenant`). `instructor_vehicles.faction` is part of both foreign keys, to `instructors(slug, faction)` and `vehicles(slug, faction)`, so a mismatch is rejected by Postgres.
 - `allowed_users.email` is stored lowercase (a check constraint enforces it). `role` has only `admin` for now.
+- `bookings` has three exclusion constraints (migration `0002_booking_exclusions`, using `btree_gist`): a student, an instructor and a vehicle each have one lesson at a time. Cancelled lessons do not count. It references vehicles and instructors with their faction, but not `instructor_vehicles`, which each seed replaces.
+- `instructor_availability` holds wall-clock times in `America/New_York`, seeded from `apps/api/src/db/availabilityData.ts`.
 - The catalog (vehicles, instructors, who teaches what) is seed data in `apps/api/src/db/catalogData.ts`, loaded by `npm run db:seed`. Instructors are seeded characters, not accounts.
 - Schema changes: edit `apps/api/src/db/schema.ts`, run `npm run db:generate`, and commit the new file in `apps/api/drizzle/`.
 
@@ -222,11 +278,9 @@ The owner's account (role `admin`) sees everything in the backend: all bookings,
 - Admin-only endpoints accept an optional instructor (e.g. `?instructor=master-chief`); without it they return everything. The API ignores or rejects the parameter for other roles.
 - The web app keeps the chosen instructor in a Pinia store, shows it in the header with a way to clear it, and passes it on every request.
 
-### Bookings
+### Lesson Sign-Off
 
-- `availability`: each instructor's weekly windows, seeded.
-- `bookings`: student, instructor, vehicle, and a `tstzrange` for the lesson. Exclusion constraints (`btree_gist`) make overlapping bookings for the same instructor, or the same vehicle, impossible. The lesson length comes from the vehicle.
-- Prerequisites: a booking for a vehicle requires its prerequisite courses to be complete (`lessons_required` lessons done). The API enforces this with `missingPrerequisites` from `@hde/shared`, which the web app already uses for its locks, and serves the student's completed courses to `stores/progress.ts`.
+An admin viewing as an instructor marks that instructor's past lessons `completed` or `missed`. Until this is built nothing completes a lesson, so locked courses stay locked.
 
 ### Demo Slots for Recruiters
 
@@ -247,6 +301,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 | System context | [System Overview](#system-overview) | GCP or Firebase services, Neon, `firebase.json` rewrites, `apps/web/src/plugins/firebase.ts` |
 | Application layers | [Application Layers](#application-layers) | Folders under `apps/*/src`, `packages/shared`, `apps/api/src/server.ts` |
 | Request authorization | [Request Authorization](#request-authorization) | `apps/api/src/app.ts`, `apps/api/src/config.ts`, `apps/web/src/services/apiClient.ts`, `apps/web/src/stores/auth.ts` |
+| Booking | [Booking](#booking) | `apps/api/src/bookings/`, `apps/api/src/http/bookingRoutes.ts`, `apps/api/src/repositories/bookingRepository.ts`, `packages/shared/src/bookings.ts` |
 | Theming | [Theming](#theming) | `apps/web/src/stores/theme.ts`, `apps/web/src/utils/themePreference.ts`, `apps/web/src/styles/themes.scss`, `apps/web/src/plugins/primevue.ts`, `FactionToggle.vue`, `ThemeToggle.vue` |
 | Tables | [Data Model](#data-model) | `apps/api/src/db/schema.ts`, `apps/api/drizzle/` |
 | Deploy pipeline | [Deployment](#deployment) | `scripts/deploy-api.ts`, `apps/api/Dockerfile`, `apps/api/cloudbuild.yaml`, `firebase.json` |
@@ -260,7 +315,8 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - API with App Check and ID token checks, JSON errors, and a config that refuses unsafe settings on Cloud Run.
 - Postgres schema and first migration: vehicles, prerequisites, instructors, who teaches what, allowlist. Seeded catalog of 10 vehicles and 6 instructors.
 - Courses page: vehicles on a route map of their prerequisites, and instructors, by faction.
-- Locks on courses whose prerequisites are not complete, and a book button in the vehicle details (a placeholder until bookings). Completed courses (`stores/progress.ts`) are always empty for now, so only the Mongoose and Ghost are open.
+- Locks on courses whose prerequisites are not complete, enforced by the API.
+- Booking: instructor hours, lesson times, booking and cancelling, My lessons, and exclusion constraints against double-booking.
 - UNSC and Covenant themes, each light and dark, with placeholder artwork.
 - Local development with Docker Postgres and the Auth emulator; unit, database and E2E tests.
 - API image, Cloud Build config and deploy script (migrate job, then service).
@@ -275,7 +331,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### Next: Features
 
-1. Bookings: availability, the booking flow, double-booking constraints, prerequisite checks.
+1. Lesson sign-off, so completed lessons unlock courses.
 2. Admin "View As" an instructor, or everything.
 3. Demo slots for recruiters.
 4. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. See [Artwork](docs/UI.md#artwork).

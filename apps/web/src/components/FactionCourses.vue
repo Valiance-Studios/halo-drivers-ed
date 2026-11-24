@@ -14,8 +14,16 @@
       :prerequisite-names="vehicle.prerequisites.map(catalogStore.vehicleName)"
       :instructors="catalogStore.instructorsFor(vehicle.slug)"
       :missing-names="progressStore.missingFor(vehicle).map(catalogStore.vehicleName)"
+      :lessons-left="progressStore.lessonsLeft(vehicle)"
       :notice="notice"
-      @book="book"
+      @book="openBooking"
+    />
+    <BookingDialog
+      v-if="vehicle && booking"
+      :vehicle="vehicle"
+      :instructors="catalogStore.instructorsFor(vehicle.slug)"
+      @close="booking = false"
+      @booked="onBooked"
     />
     <h2 class="faction-courses__heading">Instructors</h2>
     <InstructorList :instructors="catalogStore.instructorsOf(faction)" />
@@ -24,12 +32,14 @@
 
 <script lang="ts">
 import type {PropType} from 'vue';
-import type {Faction, Vehicle} from '@hde/shared';
+import type {Booking, Faction, Vehicle} from '@hde/shared';
 
 import {defineComponent} from 'vue';
 import {mapStores} from 'pinia';
 import {useCatalogStore} from '@/stores/catalog';
 import {useProgressStore} from '@/stores/progress';
+import {lessonDayAndTime} from '@/utils/lessonTime';
+import BookingDialog from '@/components/BookingDialog.vue';
 import InstructorList from '@/components/InstructorList.vue';
 import VehicleDetail from '@/components/VehicleDetail.vue';
 import VehicleRoute from '@/components/VehicleRoute.vue';
@@ -37,12 +47,12 @@ import VehicleRoute from '@/components/VehicleRoute.vue';
 /** One faction's route map, the selected vehicle's course, and the instructors. */
 export default defineComponent({
   name: 'FactionCourses',
-  components: {InstructorList, VehicleDetail, VehicleRoute},
+  components: {BookingDialog, InstructorList, VehicleDetail, VehicleRoute},
   props: {
     faction: {type: String as PropType<Faction>, required: true},
   },
   data() {
-    return {selectedSlug: null as string | null, notice: ''};
+    return {selectedSlug: null as string | null, notice: '', booking: false};
   },
   computed: {
     ...mapStores(useCatalogStore, useProgressStore),
@@ -55,9 +65,13 @@ export default defineComponent({
     },
   },
   methods: {
-    /** Stands in for the booking flow, which is not built yet. */
-    book() {
-      this.notice = 'Booking is not available yet.';
+    openBooking() {
+      this.notice = '';
+      this.booking = true;
+    },
+    onBooked({instructorSlug, startsAt}: Booking) {
+      this.booking = false;
+      this.notice = `Booked with ${this.catalogStore.instructorName(instructorSlug)}: ${lessonDayAndTime(startsAt)}.`;
     },
     /** Selects a vehicle and brings its course into view, which is off screen on a phone. */
     async select(slug: string) {

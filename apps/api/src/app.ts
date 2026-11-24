@@ -1,12 +1,14 @@
-import type {Me} from '@hde/shared';
 import type {Config} from '#src/config.ts';
 import type {TokenVerifier} from '#src/auth/tokenVerifier.ts';
+import type {BookingService} from '#src/bookings/bookingService.ts';
+import type {SignedInEnv} from '#src/http/signedIn.ts';
 import type {AllowlistRepository} from '#src/repositories/allowlistRepository.ts';
 import type {CatalogRepository} from '#src/repositories/catalogRepository.ts';
 
 import {Hono} from 'hono';
 import {createMiddleware} from 'hono/factory';
 import {APP_CHECK_HEADER} from '@hde/shared';
+import {bookingRoutes} from '#src/http/bookingRoutes.ts';
 import {ApiError} from '#src/http/errors.ts';
 
 export interface AppDependencies {
@@ -14,10 +16,7 @@ export interface AppDependencies {
   verifier: TokenVerifier;
   allowlist: AllowlistRepository;
   catalog: CatalogRepository;
-}
-
-interface SignedInEnv {
-  Variables: {me: Me};
+  bookings: BookingService;
 }
 
 const BEARER_PREFIX = 'Bearer ';
@@ -26,7 +25,7 @@ const BEARER_PREFIX = 'Bearer ';
  * The HTTP API. Every route under /api except the health check needs a valid App Check token (unless
  * turned off for the emulators), a Firebase ID token, and an account on the allowlist.
  */
-export function createApp({appCheck, verifier, allowlist, catalog}: AppDependencies): Hono {
+export function createApp({appCheck, verifier, allowlist, catalog, bookings}: AppDependencies): Hono {
   const requireSignedIn = createMiddleware<SignedInEnv>(async (c, next) => {
     if (appCheck === 'required') {
       const appCheckToken = c.req.header(APP_CHECK_HEADER);
@@ -66,7 +65,8 @@ export function createApp({appCheck, verifier, allowlist, catalog}: AppDependenc
     .use(requireSignedIn)
     .get('/me', (c) => c.json(c.var.me))
     .get('/vehicles', async (c) => c.json(await catalog.listVehicles()))
-    .get('/instructors', async (c) => c.json(await catalog.listInstructors()));
+    .get('/instructors', async (c) => c.json(await catalog.listInstructors()))
+    .route('/', bookingRoutes(bookings));
 
   const app = new Hono();
 

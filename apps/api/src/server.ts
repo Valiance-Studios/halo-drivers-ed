@@ -2,18 +2,23 @@ import {serve} from '@hono/node-server';
 import {createApp} from '#src/app.ts';
 import {loadConfig} from '#src/config.ts';
 import {createFirebaseTokenVerifier} from '#src/auth/tokenVerifier.ts';
+import {BookingService} from '#src/bookings/bookingService.ts';
 import {connect} from '#src/db/client.ts';
 import {PostgresAllowlistRepository} from '#src/repositories/allowlistRepository.ts';
+import {PostgresBookingRepository} from '#src/repositories/bookingRepository.ts';
 import {PostgresCatalogRepository} from '#src/repositories/catalogRepository.ts';
 
 const config = loadConfig();
 const {db, close} = connect(config.databaseUrl);
 
+const catalog = new PostgresCatalogRepository(db);
+
 const app = createApp({
   appCheck: config.appCheck,
   verifier: createFirebaseTokenVerifier(config.firebaseProjectId),
   allowlist: new PostgresAllowlistRepository(db),
-  catalog: new PostgresCatalogRepository(db),
+  catalog,
+  bookings: new BookingService(new PostgresBookingRepository(db), catalog),
 });
 
 const server = serve({fetch: app.fetch, port: config.port}, ({port}) => {

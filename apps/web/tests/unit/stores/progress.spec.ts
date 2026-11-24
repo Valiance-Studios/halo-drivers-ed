@@ -1,12 +1,16 @@
-import type {Vehicle} from '@hde/shared';
+import type {Booking, BookingStatus, Vehicle} from '@hde/shared';
 
-import {beforeEach, describe, expect, it} from 'vite-plus/test';
+import {beforeEach, describe, expect, it, vi} from 'vite-plus/test';
 import {createPinia, setActivePinia} from 'pinia';
+import {useBookingsStore} from '@/stores/bookings';
+import {useCatalogStore} from '@/stores/catalog';
 import {useProgressStore} from '@/stores/progress';
 
-const vehicle = (...prerequisites: string[]): Vehicle => ({
-  slug: 'pelican',
-  name: 'Pelican',
+vi.mock('@/services/api', () => ({api: {}}));
+
+const vehicle = (slug: string, ...prerequisites: string[]): Vehicle => ({
+  slug,
+  name: slug,
   faction: 'unsc',
   domain: 'air',
   description: '',
@@ -14,24 +18,45 @@ const vehicle = (...prerequisites: string[]): Vehicle => ({
   lessonsRequired: 2,
   prerequisites,
 });
+const lesson = (vehicleSlug: string, status: BookingStatus): Booking => ({
+  id: `${vehicleSlug}-${status}`,
+  vehicleSlug,
+  instructorSlug: 'arbiter',
+  startsAt: '2026-06-08T12:00:00.000Z',
+  endsAt: '2026-06-08T13:00:00.000Z',
+  status,
+});
+const FIRST = vehicle('first');
+const SECOND = vehicle('second', 'first');
 
 describe('progress store', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    useCatalogStore().vehicles = [FIRST, SECOND];
   });
 
-  it('opens courses without prerequisites to a new student', () => {
-    expect(useProgressStore().missingFor(vehicle())).toEqual([]);
-  });
-
-  it('locks a course until every prerequisite is complete', () => {
+  it('opens only courses without prerequisites to a new student', () => {
     const store = useProgressStore();
-    expect(store.missingFor(vehicle('warthog', 'hornet'))).toEqual(['warthog', 'hornet']);
 
-    store.completedSlugs = ['warthog'];
-    expect(store.missingFor(vehicle('warthog', 'hornet'))).toEqual(['hornet']);
+    expect(store.missingFor(FIRST)).toEqual([]);
+    expect(store.missingFor(SECOND)).toEqual(['first']);
+  });
 
-    store.completedSlugs = ['warthog', 'hornet'];
-    expect(store.missingFor(vehicle('warthog', 'hornet'))).toEqual([]);
+  it('unlocks a course once every lesson of its prerequisite is completed', () => {
+    const store = useProgressStore();
+    useBookingsStore().bookings = [lesson('first', 'completed'), lesson('first', 'booked')];
+    expect(store.missingFor(SECOND)).toEqual(['first']);
+
+    useBookingsStore().bookings = [lesson('first', 'completed'), lesson('first', 'completed')];
+    expect(store.missingFor(SECOND)).toEqual([]);
+  });
+
+  it('counts booked and completed lessons, but not cancelled or missed ones', () => {
+    const store = useProgressStore();
+    useBookingsStore().bookings = [lesson('first', 'cancelled'), lesson('first', 'missed')];
+    expect(store.lessonsLeft(FIRST)).toBe(2);
+
+    useBookingsStore().bookings = [lesson('first', 'completed'), lesson('first', 'booked')];
+    expect(store.lessonsLeft(FIRST)).toBe(0);
   });
 });
