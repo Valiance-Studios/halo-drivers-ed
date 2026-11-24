@@ -12,7 +12,10 @@ const catalog = new PostgresCatalogRepository(db);
 
 /** The Postgres error behind a failed Drizzle query, which wraps it in `cause`. */
 async function databaseError(query: Promise<unknown>): Promise<{code?: string; constraint?: string}> {
-  const error = await query.then(() => null, (failure: unknown) => failure as {cause?: object});
+  const error = await query.then(
+    () => null,
+    (failure: unknown) => failure as {cause?: object},
+  );
 
   return (error?.cause ?? error ?? {}) as {code?: string; constraint?: string};
 }
@@ -30,7 +33,10 @@ describe('catalog', () => {
     const vehicles = await catalog.listVehicles();
 
     expect(vehicles).toHaveLength(VEHICLES.length);
-    expect(vehicles.find((vehicle) => vehicle.slug === 'scorpion')).toMatchObject({faction: 'unsc', prerequisites: ['warthog']});
+    expect(vehicles.find((vehicle) => vehicle.slug === 'scorpion')).toMatchObject({
+      faction: 'unsc',
+      prerequisites: ['warthog'],
+    });
   });
 
   it('lists every seeded instructor with the vehicles they teach', async () => {
@@ -46,14 +52,18 @@ describe('catalog', () => {
     expect(await catalog.listVehicles()).toHaveLength(VEHICLES.length);
   });
 
-  it('rejects an instructor teaching another faction\'s vehicle', async () => {
-    const error = await databaseError(db.insert(instructorVehicles).values({instructorSlug: 'arbiter', vehicleSlug: 'warthog', faction: 'covenant'}));
+  it("rejects an instructor teaching another faction's vehicle", async () => {
+    const error = await databaseError(
+      db.insert(instructorVehicles).values({instructorSlug: 'arbiter', vehicleSlug: 'warthog', faction: 'covenant'}),
+    );
 
     expect(error.constraint).toBe('instructor_vehicles_vehicle_fkey');
   });
 
   it('rejects a vehicle that requires itself', async () => {
-    const error = await databaseError(db.insert(vehiclePrerequisites).values({vehicleSlug: 'ghost', prerequisiteSlug: 'ghost'}));
+    const error = await databaseError(
+      db.insert(vehiclePrerequisites).values({vehicleSlug: 'ghost', prerequisiteSlug: 'ghost'}),
+    );
 
     expect(error.constraint).toBe('vehicle_prerequisites_not_self');
   });

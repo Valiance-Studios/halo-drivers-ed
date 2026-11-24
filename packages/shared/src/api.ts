@@ -8,7 +8,7 @@ export interface ApiErrorBody {
 }
 
 export const API_ERROR_CODES = ['unauthenticated', 'app-check-failed', 'not-allowed', 'not-found', 'internal'] as const;
-export type ApiErrorCode = typeof API_ERROR_CODES[number];
+export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 
 /** The header that carries the App Check token, as Firebase's own services expect it. */
 export const APP_CHECK_HEADER = 'X-Firebase-AppCheck';

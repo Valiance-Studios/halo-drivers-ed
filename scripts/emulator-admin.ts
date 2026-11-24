@@ -36,7 +36,11 @@ export class EmulatorAdmin {
 
   /** Deletes every Auth account in this project. */
   async reset(): Promise<void> {
-    await request(`${AUTH_URL}/emulator/v1/projects/${this.config.projectId}/accounts`, {method: 'DELETE'}, 'clear Auth');
+    await request(
+      `${AUTH_URL}/emulator/v1/projects/${this.config.projectId}/accounts`,
+      {method: 'DELETE'},
+      'clear Auth',
+    );
   }
 
   /**
@@ -48,27 +52,42 @@ export class EmulatorAdmin {
    */
   async createGoogleAccount(account: EmulatorAccount): Promise<void> {
     // The Auth emulator accepts an unsigned ID token: just the claims, as JSON.
-    const idToken = JSON.stringify({sub: account.email, email: account.email, email_verified: true, name: account.displayName});
+    const idToken = JSON.stringify({
+      sub: account.email,
+      email: account.email,
+      email_verified: true,
+      name: account.displayName,
+    });
     const body = {
       requestUri: 'http://localhost',
       postBody: new URLSearchParams({id_token: idToken, providerId: 'google.com'}).toString(),
       returnSecureToken: true,
     };
 
-    await request(`${AUTH_URL}/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${this.config.apiKey}`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(body),
-    }, `create ${account.email}`);
+    await request(
+      `${AUTH_URL}/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${this.config.apiKey}`,
+      {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+      },
+      `create ${account.email}`,
+    );
 
-    if (!await this.hasAccount(account.email)) {
-      throw new Error(`${account.email} was created outside project "${this.config.projectId}": the emulators are running as another project.`);
+    if (!(await this.hasAccount(account.email))) {
+      throw new Error(
+        `${account.email} was created outside project "${this.config.projectId}": the emulators are running as another project.`,
+      );
     }
   }
 
   private async hasAccount(email: string): Promise<boolean> {
     const url = `${AUTH_URL}/identitytoolkit.googleapis.com/v1/projects/${this.config.projectId}/accounts:lookup`;
-    const result = await request(url, {method: 'POST', headers: ADMIN_HEADERS, body: JSON.stringify({email: [email]})}, `look up ${email}`) as {users?: unknown[]};
+    const result = (await request(
+      url,
+      {method: 'POST', headers: ADMIN_HEADERS, body: JSON.stringify({email: [email]})},
+      `look up ${email}`,
+    )) as {users?: unknown[]};
 
     return (result.users?.length ?? 0) > 0;
   }

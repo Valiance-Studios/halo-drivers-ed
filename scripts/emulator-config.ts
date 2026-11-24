@@ -21,7 +21,9 @@ function loadEmulatorConfig(): EmulatorConfig {
 
   // The `demo-` prefix is what keeps the emulators from ever reaching real Firebase resources.
   if (!projectId.startsWith('demo-')) {
-    throw new Error(`Refusing to use project "${projectId}" with the emulators: the project id in apps/web/.env.development must start with "demo-".`);
+    throw new Error(
+      `Refusing to use project "${projectId}" with the emulators: the project id in apps/web/.env.development must start with "demo-".`,
+    );
   }
 
   return {projectId, apiKey: env.VITE_FIREBASE_API_KEY ?? ''};
@@ -34,7 +36,9 @@ interface EmulatorsConfig {
   [emulator: string]: unknown;
 }
 
-const emulators = (JSON.parse(readFileSync(new URL('../firebase.json', import.meta.url), 'utf8')) as {emulators: EmulatorsConfig}).emulators;
+const emulators = (
+  JSON.parse(readFileSync(new URL('../firebase.json', import.meta.url), 'utf8')) as {emulators: EmulatorsConfig}
+).emulators;
 
 export const ports = {auth: emulators.auth.port};
 

@@ -21,7 +21,8 @@ export const VEHICLES: Vehicle[] = [
     name: 'Warthog',
     faction: 'unsc',
     domain: 'ground',
-    description: 'The UNSC\'s light reconnaissance vehicle. Handbrake turns, talking to your gunner, and recovering from a rollover.',
+    description:
+      "The UNSC's light reconnaissance vehicle. Handbrake turns, talking to your gunner, and recovering from a rollover.",
     lessonMinutes: 60,
     lessonsRequired: 4,
     prerequisites: ['mongoose'],
@@ -31,7 +32,8 @@ export const VEHICLES: Vehicle[] = [
     name: 'Scorpion',
     faction: 'unsc',
     domain: 'ground',
-    description: 'Main battle tank. Tread steering, aiming the turret independently, and checking for passengers riding on the treads.',
+    description:
+      'Main battle tank. Tread steering, aiming the turret independently, and checking for passengers riding on the treads.',
     lessonMinutes: 90,
     lessonsRequired: 6,
     prerequisites: ['warthog'],
@@ -143,7 +145,7 @@ export const INSTRUCTORS: Instructor[] = [
   },
   {
     slug: 'rtas-vadum',
-    name: 'Rtas \'Vadum',
+    name: "Rtas 'Vadum",
     title: 'Shipmaster',
     faction: 'covenant',
     bio: 'Commands from the bridge and teaches from the cockpit. Specializes in dropships and formation flying.',

@@ -39,7 +39,13 @@ export default defineComponent({
   },
   methods: {
     initials(name: string): string {
-      return name.replace(/^The /, '').split(/\s+/).map((word) => word[0]).join('').slice(0, 2).toUpperCase();
+      return name
+        .replace(/^The /, '')
+        .split(/\s+/)
+        .map((word) => word[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
     },
   },
 });

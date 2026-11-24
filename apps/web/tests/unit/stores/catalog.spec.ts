@@ -9,10 +9,19 @@ const mocks = vi.hoisted(() => ({listVehicles: vi.fn(), listInstructors: vi.fn()
 vi.mock('@/services/api', () => ({api: mocks}));
 
 const vehicle = (slug: string, faction: Vehicle['faction']): Vehicle => ({
-  slug, name: slug.toUpperCase(), faction, domain: 'ground', description: '', lessonMinutes: 60, lessonsRequired: 2, prerequisites: [],
+  slug,
+  name: slug.toUpperCase(),
+  faction,
+  domain: 'ground',
+  description: '',
+  lessonMinutes: 60,
+  lessonsRequired: 2,
+  prerequisites: [],
 });
 const VEHICLES = [vehicle('warthog', 'unsc'), vehicle('ghost', 'covenant')];
-const INSTRUCTORS: Instructor[] = [{slug: 'arbiter', name: 'The Arbiter', title: 'Arbiter', faction: 'covenant', bio: '', vehicles: ['ghost']}];
+const INSTRUCTORS: Instructor[] = [
+  {slug: 'arbiter', name: 'The Arbiter', title: 'Arbiter', faction: 'covenant', bio: '', vehicles: ['ghost']},
+];
 
 describe('catalog store', () => {
   beforeEach(() => {

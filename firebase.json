@@ -1,11 +1,7 @@
 {
   "hosting": {
     "public": "apps/web/dist",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       {
         "source": "/api/**",
@@ -19,10 +15,7 @@
         "destination": "/index.html"
       }
     ],
-    "predeploy": [
-      "node scripts/check-firebase-config.ts staging",
-      "npm run build:staging -w @hde/web"
-    ]
+    "predeploy": ["node scripts/check-firebase-config.ts staging", "npm run build:staging -w @hde/web"]
   },
   "emulators": {
     "auth": {

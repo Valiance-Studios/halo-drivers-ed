@@ -24,7 +24,7 @@ if (!databaseUrl) {
 const {db, close} = connect(databaseUrl, 1);
 
 try {
-  await new PostgresAllowlistRepository(db).allow(email, role as typeof ROLES[number]);
+  await new PostgresAllowlistRepository(db).allow(email, role as (typeof ROLES)[number]);
   console.log(`${email.toLowerCase()} can sign in as ${role} (database on ${new URL(databaseUrl).hostname}).`);
 } finally {
   await close();

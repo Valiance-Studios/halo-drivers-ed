@@ -44,12 +44,14 @@ if (run('git', ['status', '--porcelain'])) {
 
 const image = `${REGION}-docker.pkg.dev/${PROJECT}/hde/api:${run('git', ['rev-parse', '--short', 'HEAD'])}`;
 
+// oxfmt-ignore
 gcloud('builds', 'submit',
   '--config', 'apps/api/cloudbuild.yaml',
   '--substitutions', `_IMAGE=${image}`,
   '--service-account', `projects/${PROJECT}/serviceAccounts/${BUILD_SERVICE_ACCOUNT}`,
   '.');
 
+// oxfmt-ignore
 gcloud('run', 'jobs', 'deploy', MIGRATE_JOB,
   '--image', image,
   '--region', REGION,
@@ -61,6 +63,7 @@ gcloud('run', 'jobs', 'deploy', MIGRATE_JOB,
   '--max-retries', '0');
 gcloud('run', 'jobs', 'execute', MIGRATE_JOB, '--region', REGION, '--wait');
 
+// oxfmt-ignore
 gcloud('run', 'deploy', SERVICE,
   '--image', image,
   '--region', REGION,

@@ -6,9 +6,23 @@ import {describe, expect, it, vi} from 'vite-plus/test';
 import {createApp} from '#src/app.ts';
 
 const VEHICLE: Vehicle = {
-  slug: 'warthog', name: 'Warthog', faction: 'unsc', domain: 'ground', description: '', lessonMinutes: 60, lessonsRequired: 4, prerequisites: ['mongoose'],
+  slug: 'warthog',
+  name: 'Warthog',
+  faction: 'unsc',
+  domain: 'ground',
+  description: '',
+  lessonMinutes: 60,
+  lessonsRequired: 4,
+  prerequisites: ['mongoose'],
 };
-const INSTRUCTOR: Instructor = {slug: 'sergeant-johnson', name: 'Sergeant Johnson', title: 'Sergeant Major', faction: 'unsc', bio: '', vehicles: ['warthog']};
+const INSTRUCTOR: Instructor = {
+  slug: 'sergeant-johnson',
+  name: 'Sergeant Johnson',
+  title: 'Sergeant Major',
+  faction: 'unsc',
+  bio: '',
+  vehicles: ['warthog'],
+};
 
 /** Accepts the ID token "valid-<email>" and the App Check token "app". */
 const verifier: TokenVerifier = {
@@ -82,11 +96,16 @@ describe('API', () => {
     const app = makeApp();
 
     expect((await get(app, '/api/me', {'X-Firebase-AppCheck': 'app'})).status).toBe(401);
-    expect((await get(app, '/api/me', {'Authorization': 'Bearer expired', 'X-Firebase-AppCheck': 'app'})).status).toBe(401);
+    expect((await get(app, '/api/me', {'Authorization': 'Bearer expired', 'X-Firebase-AppCheck': 'app'})).status).toBe(
+      401,
+    );
   });
 
   it('rejects accounts that are not on the allowlist', async () => {
-    const response = await get(makeApp(), '/api/vehicles', {...SIGNED_IN, Authorization: 'Bearer valid-stranger@example.com'});
+    const response = await get(makeApp(), '/api/vehicles', {
+      ...SIGNED_IN,
+      Authorization: 'Bearer valid-stranger@example.com',
+    });
 
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({error: {code: 'not-allowed'}});
@@ -101,7 +120,12 @@ describe('API', () => {
 
   it('hides the details of unexpected errors', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    const app = makeApp({catalog: {listVehicles: async () => Promise.reject(new Error('connection refused')), listInstructors: async () => []}});
+    const app = makeApp({
+      catalog: {
+        listVehicles: async () => Promise.reject(new Error('connection refused')),
+        listInstructors: async () => [],
+      },
+    });
     const response = await get(app, '/api/vehicles', SIGNED_IN);
 
     expect(response.status).toBe(500);

@@ -1,8 +1,6 @@
 <template>
   <section class="courses">
-    <h1 class="courses__heading">
-      Courses
-    </h1>
+    <h1 class="courses__heading">Courses</h1>
     <Message
       v-if="catalogStore.errorMessage"
       severity="error"
@@ -33,9 +31,7 @@
           :key="option"
           :value="option"
         >
-          <h2 class="courses__subheading">
-            Vehicles
-          </h2>
+          <h2 class="courses__subheading">Vehicles</h2>
           <div class="courses__grid">
             <VehicleCard
               v-for="vehicle in catalogStore.vehiclesOf(option)"
@@ -45,9 +41,7 @@
               :instructors="catalogStore.instructorsFor(vehicle.slug)"
             />
           </div>
-          <h2 class="courses__subheading">
-            Instructors
-          </h2>
+          <h2 class="courses__subheading">Instructors</h2>
           <InstructorList :instructors="catalogStore.instructorsOf(option)" />
         </TabPanel>
       </TabPanels>

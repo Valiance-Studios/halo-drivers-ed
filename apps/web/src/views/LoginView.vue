@@ -2,13 +2,9 @@
   <section class="login">
     <Card class="login__card">
       <template #title>
-        <h1 class="login__heading">
-          Sign in
-        </h1>
+        <h1 class="login__heading">Sign in</h1>
       </template>
-      <template #subtitle>
-        Driving lessons for UNSC and Covenant vehicles
-      </template>
+      <template #subtitle> Driving lessons for UNSC and Covenant vehicles </template>
       <template #content>
         <Message
           v-if="authStore.errorMessage"

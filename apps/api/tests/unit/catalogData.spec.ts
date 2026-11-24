@@ -22,7 +22,10 @@ describe('catalog data', () => {
       const teachers = INSTRUCTORS.filter((instructor) => instructor.vehicles.includes(vehicle.slug));
 
       expect(teachers.length, vehicle.slug).toBeGreaterThan(0);
-      expect(teachers.every((instructor) => instructor.faction === vehicle.faction), vehicle.slug).toBe(true);
+      expect(
+        teachers.every((instructor) => instructor.faction === vehicle.faction),
+        vehicle.slug,
+      ).toBe(true);
     }
   });
 });

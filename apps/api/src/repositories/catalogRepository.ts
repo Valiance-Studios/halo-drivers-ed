@@ -35,7 +35,11 @@ export class PostgresCatalogRepository implements CatalogRepository {
       this.db.select().from(vehicles).orderBy(asc(vehicles.faction), asc(vehicles.lessonsRequired), asc(vehicles.name)),
       this.db.select().from(vehiclePrerequisites).orderBy(asc(vehiclePrerequisites.prerequisiteSlug)),
     ]);
-    const prerequisites = groupBy(links, (link) => link.vehicleSlug, (link) => link.prerequisiteSlug);
+    const prerequisites = groupBy(
+      links,
+      (link) => link.vehicleSlug,
+      (link) => link.prerequisiteSlug,
+    );
 
     return rows.map((row) => ({...row, prerequisites: prerequisites.get(row.slug) ?? []}));
   }
@@ -45,7 +49,11 @@ export class PostgresCatalogRepository implements CatalogRepository {
       this.db.select().from(instructors).orderBy(asc(instructors.faction), asc(instructors.name)),
       this.db.select().from(instructorVehicles).orderBy(asc(instructorVehicles.vehicleSlug)),
     ]);
-    const teaching = groupBy(links, (link) => link.instructorSlug, (link) => link.vehicleSlug);
+    const teaching = groupBy(
+      links,
+      (link) => link.instructorSlug,
+      (link) => link.vehicleSlug,
+    );
 
     return rows.map((row) => ({...row, vehicles: teaching.get(row.slug) ?? []}));
   }
