@@ -1,6 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120">
   <!-- Original placeholder drawing, not a game file. -->
+  <!-- Hull, then the gun's ammunition box and shield -->
   <path fill="#7F9160" d="M14 62L30 46H92L104 44L128 46L146 50L200 52L226 66L230 78L216 78C210 56 168 54 160 84L154 92H88L80 84C72 56 34 56 26 80H14z" />
-  <path fill="#4A5640" d="M100 46L112 22H124L146 50H138L120 28H116L108 46zM52 46L58 26H74L78 46zM44 14H74L76 17H124V23H76L72 30H46zM222 76L238 70L234 82L218 88zM30 84a24 24 0 1 0 48 0a24 24 0 1 0 -48 0zM164 84a24 24 0 1 0 48 0a24 24 0 1 0 -48 0z" />
-  <path fill="#D9C27A" d="M122 32L138 50H126zM45 84a9 9 0 1 0 18 0a9 9 0 1 0 -18 0zM179 84a9 9 0 1 0 18 0a9 9 0 1 0 -18 0z" />
+  <path fill="#7F9160" d="M36 22H54V36H36zM67 0H75L80 12L75 25H67z" />
+  <!-- Roll cage, tow hook and wheels -->
+  <path fill="#4A5640" d="M100 46L112 24H124L146 50H138L120 30H116L108 46zM222 76L238 70L234 82L218 88zM30 84a24 24 0 1 0 48 0a24 24 0 1 0 -48 0zM164 84a24 24 0 1 0 48 0a24 24 0 1 0 -48 0z" />
+  <!-- Chain gun: swivel mount, grips, receiver, three barrels and the clamps that hold them -->
+  <path fill="#4A5640" d="M50 46L56 38H59V24H67V38H70L76 46zM24 7H40V11H29V21H24zM38 4H67V22H38z" />
+  <path fill="#76807A" d="M74 5H136V8H74zM74 10.5H136V13.5H74zM74 16H136V19H74zM96 3H101V21H96zM127 3H133V21H127z" />
+  <path fill="#D9C27A" d="M122 34L138 50H126zM45 84a9 9 0 1 0 18 0a9 9 0 1 0 -18 0zM179 84a9 9 0 1 0 18 0a9 9 0 1 0 -18 0z" />
 </svg>
