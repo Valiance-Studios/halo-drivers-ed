@@ -41,7 +41,7 @@ A dialog to choose an instructor, a day and a time in the next 14 days, in the v
 
 ## Schedule (`/schedule`)
 
-Admins only; others are sent to Courses. Lessons **To sign off** (started and not signed off), **Upcoming** and **Signed off**, for everyone or, with the **View as** list, one instructor. The choice lasts until the page is reloaded or the account signs out.
+Admins only; others are sent to Courses. Lessons **To sign off** (started and not signed off), **Upcoming** and **Signed off**, for everyone or, with the **View as** list, one instructor. Every lesson links to its form, which cannot be marked before the lesson starts. The choice of instructor lasts until the page is reloaded or the account signs out.
 
 ### Lesson Form (`/schedule/:id`)
 

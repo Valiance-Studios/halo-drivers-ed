@@ -191,7 +191,7 @@ export default defineComponent({
       }
 
       if (!this.hasStarted) {
-        return 'Skills can be marked once the lesson starts.';
+        return 'Skills can be marked once the lesson starts, and it can be signed off once it ends.';
       }
 
       if (!this.hasEnded) {

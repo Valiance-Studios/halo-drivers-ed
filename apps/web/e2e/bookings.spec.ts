@@ -26,6 +26,12 @@ test('books a course until its lessons run out, and cancels', async ({page}) => 
   await expect(page.getByRole('button', {name: 'Book Mongoose lesson'})).toBeDisabled();
   await expect(page.getByText('You have booked every lesson in this course.')).toBeVisible();
 
+  // Instructors can look at an upcoming lesson's form, but not mark it yet.
+  await page.getByRole('link', {name: 'Schedule'}).click();
+  await page.getByRole('link', {name: 'View form'}).first().click();
+  await expect(page.getByRole('button', {name: 'Pass', exact: true}).first()).toBeDisabled();
+  await expect(page.getByText(/^Skills can be marked once the lesson starts/)).toBeVisible();
+
   await page.getByRole('link', {name: 'My lessons'}).click();
   const cancel = page.getByRole('button', {name: 'Cancel lesson'});
   await expect(cancel).toHaveCount(2);

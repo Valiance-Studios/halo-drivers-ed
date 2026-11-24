@@ -29,11 +29,10 @@
         >
           <template #actions="{lesson}">
             <Button
-              v-if="new Date(lesson.startsAt) <= now"
               as="router-link"
               :to="{name: 'lesson-form', params: {id: lesson.id}}"
-              :label="lesson.status === 'booked' ? 'Open form' : 'View form'"
-              :outlined="lesson.status !== 'booked'"
+              :label="isWaiting(lesson) ? 'Open form' : 'View form'"
+              :outlined="!isWaiting(lesson)"
             />
           </template>
         </LessonList>
@@ -46,7 +45,7 @@
 </template>
 
 <script lang="ts">
-import type {AdminLesson} from '@hde/shared';
+import type {AdminLesson, Booking} from '@hde/shared';
 
 import {defineComponent} from 'vue';
 import {mapStores} from 'pinia';
@@ -72,14 +71,13 @@ export default defineComponent({
   computed: {
     ...mapStores(useCatalogStore, useViewAsStore),
     groups(): LessonGroup[] {
-      const started = (lesson: AdminLesson) => new Date(lesson.startsAt) <= this.now;
       const booked = this.lessons.filter(({status}) => status === 'booked');
 
       return [
-        {title: 'To sign off', lessons: booked.filter(started), empty: 'Nothing is waiting to be signed off.'},
+        {title: 'To sign off', lessons: booked.filter(this.isWaiting), empty: 'Nothing is waiting to be signed off.'},
         {
           title: 'Upcoming',
-          lessons: booked.filter((lesson) => !started(lesson)),
+          lessons: booked.filter((lesson) => !this.isWaiting(lesson)),
           empty: 'No lessons are booked.',
         },
         {
@@ -100,6 +98,10 @@ export default defineComponent({
     void this.load();
   },
   methods: {
+    /** Whether the lesson has started and is not signed off. */
+    isWaiting({status, startsAt}: Booking): boolean {
+      return status === 'booked' && new Date(startsAt) <= this.now;
+    },
     async load() {
       const {instructorSlug} = this.viewAsStore;
       this.loading = true;
