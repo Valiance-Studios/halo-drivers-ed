@@ -6,6 +6,8 @@ export interface VerifiedUser {
   uid: string;
   /** Null for accounts without one, such as the anonymous demo guests to come. */
   email: string | null;
+  /** The account's name, if it has one. */
+  displayName: string | null;
 }
 
 /** Checks the tokens a request carries. An interface, so the HTTP layer can be tested without Firebase. */
@@ -15,6 +17,8 @@ export interface TokenVerifier {
   /** Rejects unless the App Check token was issued to one of this project's apps. */
   verifyAppCheckToken(token: string): Promise<void>;
 }
+
+const MAX_NAME_LENGTH = 100;
 
 /**
  * Verifies tokens with the Firebase Admin SDK. Both checks use Google's public keys, so the service
@@ -29,7 +33,11 @@ export function createFirebaseTokenVerifier(projectId: string): TokenVerifier {
     async verifyIdToken(token) {
       const decoded = await auth.verifyIdToken(token);
 
-      return {uid: decoded.uid, email: decoded.email ?? null};
+      // The name comes from the account's owner, so its type and length are not taken on trust.
+      const name: unknown = decoded.name;
+      const displayName = typeof name === 'string' ? name.trim().slice(0, MAX_NAME_LENGTH) || null : null;
+
+      return {uid: decoded.uid, email: decoded.email ?? null, displayName};
     },
     async verifyAppCheckToken(token) {
       await appCheck.verifyToken(token);

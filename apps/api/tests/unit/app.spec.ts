@@ -1,11 +1,13 @@
-import type {Booking, Instructor, Role, Vehicle} from '@hde/shared';
+import type {Booking, CourseLesson, Instructor, Role, Vehicle} from '@hde/shared';
 import type {AppDependencies} from '#src/app.ts';
 import type {TokenVerifier} from '#src/auth/tokenVerifier.ts';
 import type {BookingRepository} from '#src/repositories/bookingRepository.ts';
+import type {LessonRepository} from '#src/repositories/lessonRepository.ts';
 
 import {describe, expect, it, vi} from 'vite-plus/test';
 import {createApp} from '#src/app.ts';
 import {BookingService} from '#src/bookings/bookingService.ts';
+import {LessonService} from '#src/lessons/lessonService.ts';
 
 const VEHICLE: Vehicle = {
   slug: 'warthog',
@@ -33,6 +35,7 @@ const BOOKING: Booking = {
   startsAt: '2026-06-09T12:00:00.000Z',
   endsAt: '2026-06-09T13:00:00.000Z',
   status: 'booked',
+  lessonNumber: null,
 };
 
 /** Holds one lesson, which belongs to pat@example.com. */
@@ -43,7 +46,27 @@ const bookingRepository: BookingRepository = {
   create: async () => null,
   cancel: async () => null,
 };
-const catalog = {listVehicles: async () => [VEHICLE], listInstructors: async () => [INSTRUCTOR]};
+const LESSON: CourseLesson = {
+  vehicleSlug: 'warthog',
+  number: 1,
+  title: 'Systems and startup',
+  skills: [{id: 'startEngine', label: 'Start the engine'}],
+};
+const catalog = {
+  listVehicles: async () => [VEHICLE],
+  listInstructors: async () => [INSTRUCTOR],
+  listCurriculum: async () => [LESSON],
+};
+
+const lessonRepository: LessonRepository = {
+  list: async () => [{...BOOKING, studentEmail: 'pat@example.com', studentName: 'Pat'}],
+  findContext: async () => ({
+    lesson: {...BOOKING, studentEmail: 'pat@example.com', studentName: 'Pat'},
+    studentBookings: [BOOKING],
+    marked: [],
+  }),
+  update: async () => null,
+};
 
 /** Accepts the ID token "valid-<email>" and the App Check token "app". */
 const verifier: TokenVerifier = {
@@ -52,7 +75,7 @@ const verifier: TokenVerifier = {
       throw new Error('bad token');
     }
 
-    return {uid: 'uid', email: token.slice('valid-'.length)};
+    return {uid: 'uid', email: token.slice('valid-'.length), displayName: 'Pat'};
   },
   async verifyAppCheckToken(token) {
     if (token !== 'app') {
@@ -62,14 +85,18 @@ const verifier: TokenVerifier = {
 };
 
 function makeApp(overrides: Partial<AppDependencies> = {}) {
-  const roles: Record<string, Role> = {'pat@example.com': 'admin'};
+  const roles: Record<string, Role> = {'pat@example.com': 'admin', 'sam@example.com': 'student'};
 
   return createApp({
     appCheck: 'required',
     verifier,
-    allowlist: {findRole: vi.fn(async (email: string) => roles[email.toLowerCase()] ?? null)},
+    allowlist: {
+      findRole: vi.fn(async (email: string) => roles[email.toLowerCase()] ?? null),
+      rememberName: async () => {},
+    },
     catalog,
     bookings: new BookingService(bookingRepository, catalog),
+    lessons: new LessonService(lessonRepository, catalog),
     ...overrides,
   });
 }
@@ -157,6 +184,54 @@ describe('API', () => {
     expect(response.status).toBe(404);
   });
 
+  it('serves every lesson and its form to admins', async () => {
+    const lessons = await get(makeApp(), '/api/admin/lessons', SIGNED_IN);
+    expect(await lessons.json()).toEqual([{...BOOKING, studentEmail: 'pat@example.com', studentName: 'Pat'}]);
+
+    const form = await get(makeApp(), `/api/admin/lessons/${BOOKING.id}/form`, SIGNED_IN);
+    expect(await form.json()).toEqual({lesson: LESSON, results: {}, passedBefore: []});
+  });
+
+  it.each([
+    ['GET', '/api/admin/lessons'],
+    ['GET', `/api/admin/lessons/${BOOKING.id}`],
+    ['GET', `/api/admin/lessons/${BOOKING.id}/form`],
+    ['PUT', `/api/admin/lessons/${BOOKING.id}/results/startEngine`],
+    ['PUT', `/api/admin/lessons/${BOOKING.id}/sign-off`],
+  ])('keeps students out of %s %s', async (method, path) => {
+    const headers = {...SIGNED_IN, Authorization: 'Bearer valid-sam@example.com'};
+    const response = await makeApp().request(path, {method, headers});
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({error: {code: 'not-admin'}});
+  });
+
+  it.each([
+    ['sign-off', 'null'],
+    ['sign-off', '{"results":{}}'],
+    ['sign-off', '{"results":[],"attendance":"attended"}'],
+    ['sign-off', '{"results":{"a":"maybe"},"attendance":"attended"}'],
+    ['results/startEngine', '{}'],
+    ['results/startEngine', '{"result":"maybe"}'],
+    ['results/startEngine', '{"result":"pass","early":"yes"}'],
+    ['sign-off', '{"results":{},"attendance":"missed","early":1}'],
+  ])('rejects %s with %s', async (path, body) => {
+    const response = await makeApp().request(`/api/admin/lessons/${BOOKING.id}/${path}`, {
+      method: 'PUT',
+      headers: SIGNED_IN,
+      body,
+    });
+
+    expect(response.status).toBe(400);
+  });
+
+  it('remembers the name an account signs in with', async () => {
+    const rememberName = vi.fn(async () => {});
+    await get(makeApp({allowlist: {findRole: async () => 'student', rememberName}}), '/api/me', SIGNED_IN);
+
+    expect(rememberName).toHaveBeenCalledWith('pat@example.com', 'Pat');
+  });
+
   it('answers unknown endpoints with a JSON 404', async () => {
     const response = await get(makeApp(), '/api/nope', SIGNED_IN);
 
@@ -170,6 +245,7 @@ describe('API', () => {
       catalog: {
         listVehicles: async () => Promise.reject(new Error('connection refused')),
         listInstructors: async () => [],
+        listCurriculum: async () => [],
       },
     });
     const response = await get(app, '/api/vehicles', SIGNED_IN);

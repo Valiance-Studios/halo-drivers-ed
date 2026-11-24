@@ -11,12 +11,15 @@ export const API_ERROR_CODES = [
   'unauthenticated',
   'app-check-failed',
   'not-allowed',
+  'not-admin',
   'not-found',
   'invalid-request',
   'course-locked',
   'no-lessons-left',
   'slot-unavailable',
   'too-late-to-cancel',
+  'too-early',
+  'sign-off-conflict',
   'internal',
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

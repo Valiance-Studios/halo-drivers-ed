@@ -1,5 +1,6 @@
 import {sql} from 'drizzle-orm';
 import {
+  boolean,
   check,
   foreignKey,
   index,
@@ -13,7 +14,7 @@ import {
   unique,
   uuid,
 } from 'drizzle-orm/pg-core';
-import {BOOKING_STATUSES, FACTIONS, ROLES, VEHICLE_DOMAINS} from '@hde/shared';
+import {BOOKING_STATUSES, FACTIONS, ROLES, SKILL_RESULTS, VEHICLE_DOMAINS} from '@hde/shared';
 
 /*
  * Column names are snake_case in the database and camelCase here (`casing: 'snake_case'` in both
@@ -24,6 +25,7 @@ export const factionEnum = pgEnum('faction', FACTIONS);
 export const vehicleDomainEnum = pgEnum('vehicle_domain', VEHICLE_DOMAINS);
 export const roleEnum = pgEnum('role', ROLES);
 export const bookingStatusEnum = pgEnum('booking_status', BOOKING_STATUSES);
+export const skillResultEnum = pgEnum('skill_result', SKILL_RESULTS);
 
 export const vehicles = pgTable(
   'vehicles',
@@ -104,6 +106,8 @@ export const allowedUsers = pgTable(
   'allowed_users',
   {
     email: text().primaryKey(),
+    /** From the Google account, kept up to date as the account signs in. */
+    displayName: text(),
     role: roleEnum().notNull(),
     createdAt: timestamp({withTimezone: true}).notNull().defaultNow(),
   },
@@ -129,6 +133,43 @@ export const instructorAvailability = pgTable(
   ],
 );
 
+/** Each course's lessons. Ones dropped from the seed data stay, since bookings may refer to them. */
+export const courseLessons = pgTable(
+  'course_lessons',
+  {
+    vehicleSlug: text()
+      .notNull()
+      .references(() => vehicles.slug, {onDelete: 'cascade'}),
+    number: integer().notNull(),
+    title: text().notNull(),
+  },
+  (table) => [
+    primaryKey({columns: [table.vehicleSlug, table.number]}),
+    check('course_lessons_number_positive', sql`${table.number} > 0`),
+  ],
+);
+
+/** The skills marked in each lesson. Ones dropped from the seed data are kept for past results, but not active. */
+export const lessonSkills = pgTable(
+  'lesson_skills',
+  {
+    vehicleSlug: text().notNull(),
+    lessonNumber: integer().notNull(),
+    id: text().notNull(),
+    position: integer().notNull(),
+    label: text().notNull(),
+    active: boolean().notNull().default(true),
+  },
+  (table) => [
+    primaryKey({columns: [table.vehicleSlug, table.lessonNumber, table.id]}),
+    foreignKey({
+      name: 'lesson_skills_lesson_fkey',
+      columns: [table.vehicleSlug, table.lessonNumber],
+      foreignColumns: [courseLessons.vehicleSlug, courseLessons.number],
+    }).onDelete('cascade'),
+  ],
+);
+
 /**
  * Lessons. The faction is part of both foreign keys, as in instructor_vehicles. It does not reference that
  * table, which the seed replaces. Exclusion constraints, which Drizzle cannot declare, are in the
@@ -147,6 +188,9 @@ export const bookings = pgTable(
     startsAt: timestamp({withTimezone: true}).notNull(),
     endsAt: timestamp({withTimezone: true}).notNull(),
     status: bookingStatusEnum().notNull().default('booked'),
+    lessonNumber: integer(),
+    signedOffBy: text(),
+    signedOffAt: timestamp({withTimezone: true}),
     createdAt: timestamp({withTimezone: true}).notNull().defaultNow(),
   },
   (table) => [
@@ -161,6 +205,47 @@ export const bookings = pgTable(
       foreignColumns: [vehicles.slug, vehicles.faction],
     }),
     check('bookings_order', sql`${table.startsAt} < ${table.endsAt}`),
+    // The target of skill_results' vehicle-matching foreign key.
+    unique('bookings_id_vehicle_key').on(table.id, table.vehicleSlug),
+    foreignKey({
+      name: 'bookings_lesson_fkey',
+      columns: [table.vehicleSlug, table.lessonNumber],
+      foreignColumns: [courseLessons.vehicleSlug, courseLessons.number],
+    }),
+    // As text, since a migration cannot use an enum value it adds in the same transaction.
+    check(
+      'bookings_lesson_number',
+      sql`(${table.status}::text in ('completed', 'repeat')) = (${table.lessonNumber} is not null)`,
+    ),
+    check(
+      'bookings_signed_off',
+      sql`(${table.status}::text in ('completed', 'repeat', 'missed')) = (${table.signedOffBy} is not null and ${table.signedOffAt} is not null)`,
+    ),
     index('bookings_student_idx').on(table.studentEmail, table.startsAt),
+  ],
+);
+
+/** How a student did on each skill in a lesson. The vehicle is in both foreign keys, so it must match. */
+export const skillResults = pgTable(
+  'skill_results',
+  {
+    bookingId: uuid().notNull(),
+    vehicleSlug: text().notNull(),
+    lessonNumber: integer().notNull(),
+    skillId: text().notNull(),
+    result: skillResultEnum().notNull(),
+  },
+  (table) => [
+    primaryKey({columns: [table.bookingId, table.lessonNumber, table.skillId]}),
+    foreignKey({
+      name: 'skill_results_booking_fkey',
+      columns: [table.bookingId, table.vehicleSlug],
+      foreignColumns: [bookings.id, bookings.vehicleSlug],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'skill_results_skill_fkey',
+      columns: [table.vehicleSlug, table.lessonNumber, table.skillId],
+      foreignColumns: [lessonSkills.vehicleSlug, lessonSkills.lessonNumber, lessonSkills.id],
+    }),
   ],
 );

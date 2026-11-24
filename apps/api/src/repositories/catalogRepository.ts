@@ -1,12 +1,21 @@
-import type {Instructor, Vehicle} from '@hde/shared';
+import type {CourseLesson, Instructor, Vehicle} from '@hde/shared';
 import type {Database} from '#src/db/client.ts';
 
-import {asc} from 'drizzle-orm';
-import {instructors, instructorVehicles, vehiclePrerequisites, vehicles} from '#src/db/schema.ts';
+import {and, asc, eq} from 'drizzle-orm';
+import {
+  courseLessons,
+  instructors,
+  instructorVehicles,
+  lessonSkills,
+  vehiclePrerequisites,
+  vehicles,
+} from '#src/db/schema.ts';
 
 export interface CatalogRepository {
   listVehicles(): Promise<Vehicle[]>;
   listInstructors(): Promise<Instructor[]>;
+  /** Every course's lessons, in order, with the skills marked in each. */
+  listCurriculum(): Promise<CourseLesson[]>;
 }
 
 /** Groups `[key, value]` rows into lists of values per key. */
@@ -56,5 +65,36 @@ export class PostgresCatalogRepository implements CatalogRepository {
     );
 
     return rows.map((row) => ({...row, vehicles: teaching.get(row.slug) ?? []}));
+  }
+
+  async listCurriculum(): Promise<CourseLesson[]> {
+    const rows = await this.db
+      .select({
+        vehicleSlug: courseLessons.vehicleSlug,
+        number: courseLessons.number,
+        title: courseLessons.title,
+        id: lessonSkills.id,
+        label: lessonSkills.label,
+      })
+      .from(courseLessons)
+      .innerJoin(
+        lessonSkills,
+        and(
+          eq(lessonSkills.vehicleSlug, courseLessons.vehicleSlug),
+          eq(lessonSkills.lessonNumber, courseLessons.number),
+          eq(lessonSkills.active, true),
+        ),
+      )
+      .orderBy(asc(courseLessons.vehicleSlug), asc(courseLessons.number), asc(lessonSkills.position));
+    const lessons = new Map<string, CourseLesson>();
+
+    for (const {id, label, ...lesson} of rows) {
+      const key = `${lesson.vehicleSlug}/${lesson.number}`;
+      const entry = lessons.get(key) ?? {...lesson, skills: []};
+      entry.skills.push({id, label});
+      lessons.set(key, entry);
+    }
+
+    return [...lessons.values()];
   }
 }

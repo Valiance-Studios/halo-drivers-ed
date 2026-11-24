@@ -1,5 +1,5 @@
-/** What a signed-in account may do. Only admins exist for now; demo guests come with the demo slots. */
-export const ROLES = ['admin'] as const;
+/** What a signed-in account may do. Everyone can book lessons; admins also sign them off. */
+export const ROLES = ['admin', 'student'] as const;
 export type Role = (typeof ROLES)[number];
 
 /** The signed-in account, as the API sees it (`GET /api/me`). */
