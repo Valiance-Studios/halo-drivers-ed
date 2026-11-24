@@ -1,6 +1,6 @@
 import type {TokenSource} from '@/services/apiClient';
 
-import {describe, expect, it, vi} from 'vitest';
+import {describe, expect, it, vi} from 'vite-plus/test';
 import {ApiClient, ApiRequestError} from '@/services/apiClient';
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -15,11 +15,13 @@ describe('ApiClient', () => {
     const me = await new ApiClient(tokens, '/api', fetchImpl).getMe();
 
     expect(me).toEqual({email: 'pat@example.com', role: 'admin'});
-    expect(fetchImpl).toHaveBeenCalledWith('/api/me', {headers: {
-      'Accept': 'application/json',
-      'Authorization': 'Bearer id-token',
-      'X-Firebase-AppCheck': 'app-check-token',
-    }});
+    expect(fetchImpl).toHaveBeenCalledWith('/api/me', {
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer id-token',
+        'X-Firebase-AppCheck': 'app-check-token',
+      },
+    });
   });
 
   it('leaves out tokens it does not have', async () => {

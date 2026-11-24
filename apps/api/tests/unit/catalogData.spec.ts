@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it} from 'vite-plus/test';
 import {INSTRUCTORS, VEHICLES} from '#src/db/catalogData.ts';
 
 const vehiclesBySlug = new Map(VEHICLES.map((vehicle) => [vehicle.slug, vehicle]));
@@ -22,7 +22,10 @@ describe('catalog data', () => {
       const teachers = INSTRUCTORS.filter((instructor) => instructor.vehicles.includes(vehicle.slug));
 
       expect(teachers.length, vehicle.slug).toBeGreaterThan(0);
-      expect(teachers.every((instructor) => instructor.faction === vehicle.faction), vehicle.slug).toBe(true);
+      expect(
+        teachers.every((instructor) => instructor.faction === vehicle.faction),
+        vehicle.slug,
+      ).toBe(true);
     }
   });
 });

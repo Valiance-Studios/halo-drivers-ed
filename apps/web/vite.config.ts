@@ -1,4 +1,4 @@
-import {defineConfig, loadEnv} from 'vite';
+import {defineConfig, loadEnv} from 'vite-plus';
 import vue from '@vitejs/plugin-vue';
 import components from 'unplugin-vue-components/vite';
 import {PrimeVueResolver} from '@primevue/auto-import-resolver';
@@ -32,6 +32,12 @@ export default defineConfig(({mode}) => ({
     // discovering new ones and re-bundling, and a page could load two copies of Vue ("reading 'ce'").
     // PrimeVue ships ESM, so serve it as is.
     exclude: ['primevue'],
+  },
+  test: {
+    name: 'web',
+    root: import.meta.dirname,
+    include: ['tests/unit/**/*.spec.ts'],
+    environment: 'jsdom',
   },
   build: {
     rolldownOptions: {

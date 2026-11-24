@@ -19,12 +19,23 @@ export const useCatalogStore = defineStore('catalog', {
     errorMessage: null,
   }),
   getters: {
-    vehiclesOf: (state) => (faction: Faction): Vehicle[] => state.vehicles.filter((vehicle) => vehicle.faction === faction),
-    instructorsOf: (state) => (faction: Faction): Instructor[] => state.instructors.filter((instructor) => instructor.faction === faction),
-    vehicleName: (state) => (slug: string): string => state.vehicles.find((vehicle) => vehicle.slug === slug)?.name ?? slug,
+    vehiclesOf:
+      (state) =>
+      (faction: Faction): Vehicle[] =>
+        state.vehicles.filter((vehicle) => vehicle.faction === faction),
+    instructorsOf:
+      (state) =>
+      (faction: Faction): Instructor[] =>
+        state.instructors.filter((instructor) => instructor.faction === faction),
+    vehicleName:
+      (state) =>
+      (slug: string): string =>
+        state.vehicles.find((vehicle) => vehicle.slug === slug)?.name ?? slug,
     /** The instructors who teach a vehicle. */
-    instructorsFor: (state) => (vehicleSlug: string): Instructor[] =>
-      state.instructors.filter((instructor) => instructor.vehicles.includes(vehicleSlug)),
+    instructorsFor:
+      (state) =>
+      (vehicleSlug: string): Instructor[] =>
+        state.instructors.filter((instructor) => instructor.vehicles.includes(vehicleSlug)),
   },
   actions: {
     async load(): Promise<void> {

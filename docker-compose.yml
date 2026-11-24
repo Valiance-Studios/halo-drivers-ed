@@ -8,12 +8,12 @@ services:
       POSTGRES_PASSWORD: hde
       POSTGRES_DB: halo_drivers_ed
     ports:
-      - "5433:5432"
+      - '5433:5432'
     volumes:
       # From Postgres 18, the image keeps its data in a versioned folder under /var/lib/postgresql.
       - postgres-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hde -d halo_drivers_ed"]
+      test: ['CMD-SHELL', 'pg_isready -U hde -d halo_drivers_ed']
       interval: 2s
       timeout: 5s
       retries: 15

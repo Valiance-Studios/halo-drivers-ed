@@ -22,7 +22,9 @@
 
 ## Code Style
 
-ESLint (`npm run lint`) enforces most formatting. These conventions are not enforced by the linter but should be followed:
+Vite+ (`vite-plus`) is the toolchain. Its configuration is in the root `vite.config.ts` (`fmt`, `lint` and `test` keys) and `apps/web/vite.config.ts`; don't add separate Oxlint, Oxfmt or Vitest config files (`vitest.db.config.ts` is the exception, so that `vp test` needs no database). Import from `vite-plus` and `vite-plus/test`, not `vite` and `vitest`.
+
+Oxfmt (`npm run fmt`) formats the code and Oxlint lints it. ESLint is kept only for `eslint-plugin-vue` on `.vue` files (`eslint.config.js`), because Oxlint cannot lint templates; add other rules to Oxlint. `npm run lint` runs both. These conventions are not enforced by any of them but should be followed:
 
 - Put `import type {...}` statements first as their own group, followed by a blank line, then value imports. Do not use inline `type` modifiers inside value imports (e.g. `import {foo, type Bar}`).
 - Leave a blank line before a `try`, between consecutive `if` blocks, and before a `return` that follows a block.
@@ -84,5 +86,5 @@ Mermaid diagrams in `ARCHITECTURE.md` are required, and a stale diagram counts a
 - Keep the documentation up to date in each change, including "Project Status" in `ARCHITECTURE.md`, the handoff document between sessions.
 - Work on a feature branch (e.g. `feature/<name>`) per step, never directly on `main`. The user reviews and merges pull requests.
 - Only commit, push, or open a pull request when asked.
-- Before opening a pull request, run `npm run lint`, `npm run build` (includes the type-check), `npm run test:unit`, `npm run test:db` and `npm run test:e2e`.
+- Before opening a pull request, run `npm run check` (formatting and lint), `npm run build` (includes the type-check), `npm run test:unit`, `npm run test:db` and `npm run test:e2e`.
 - Pull request descriptions include a Summary, a Test plan checklist, and Notes for decisions or caveats.

@@ -16,10 +16,14 @@
     "dev:api": "npm run dev -w @hde/api",
     "build": "npm run type-check && npm run build -w @hde/web && npm run build -w @hde/api",
     "type-check": "vue-tsc --build",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "test:unit": "vitest run",
-    "test:db": "vitest run --config vitest.db.config.ts",
+    "check": "vp check && npm run lint:vue",
+    "fmt": "vp fmt",
+    "fmt:check": "vp fmt --check",
+    "lint": "vp lint && npm run lint:vue",
+    "lint:fix": "vp lint --fix && npm run lint:vue -- --fix",
+    "lint:vue": "eslint --max-warnings 0 .",
+    "test:unit": "vp test run",
+    "test:db": "vp test run --config vitest.db.config.ts",
     "test:e2e": "playwright test --config apps/web/playwright.config.ts",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
@@ -35,17 +39,15 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1",
-    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^26.6.6",
     "@vue/tsconfig": "^0.9.1",
     "eslint": "^10.15.0",
     "eslint-plugin-vue": "^10.12.1",
     "firebase-tools": "^15.37.0",
-    "globals": "^17.14.0",
     "typescript": "~6.0.3",
-    "typescript-eslint": "^8.73.0",
-    "vite": "^8.3.8",
-    "vitest": "^5.1.1",
+    "typescript-eslint": "^8.74.0",
+    "vite": "npm:@voidzero-dev/vite-plus-core@8.3.8001",
+    "vite-plus": "1.8.0",
     "vue-tsc": "^3.3.14"
   },
   "allowScripts": {
@@ -57,6 +59,7 @@
     "@parcel/watcher": false
   },
   "overrides": {
-    "@grpc/grpc-js": "^1.14.7"
+    "@grpc/grpc-js": "^1.14.7",
+    "vite": "npm:@voidzero-dev/vite-plus-core@8.3.8001"
   }
 }

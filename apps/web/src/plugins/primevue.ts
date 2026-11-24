@@ -26,9 +26,12 @@ const HaloPreset = definePreset(Aura, {
   },
 });
 
-export const primeVue: [Plugin, unknown] = [PrimeVue, {
-  theme: {
-    preset: HaloPreset,
-    options: {darkModeSelector: `.${DARK_MODE_CLASS}`},
+export const primeVue: [Plugin, unknown] = [
+  PrimeVue,
+  {
+    theme: {
+      preset: HaloPreset,
+      options: {darkModeSelector: `.${DARK_MODE_CLASS}`},
+    },
   },
-}];
+];

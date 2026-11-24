@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it} from 'vite-plus/test';
 import {findConfigProblems} from '../../scripts/check-firebase-config.ts';
 
 const COMPLETE = {
@@ -15,7 +15,9 @@ describe('findConfigProblems', () => {
   });
 
   it('requires the App Check site key', () => {
-    expect(findConfigProblems({...COMPLETE, VITE_APPCHECK_SITE_KEY: ''}, 'staging')[0]).toContain('VITE_APPCHECK_SITE_KEY');
+    expect(findConfigProblems({...COMPLETE, VITE_APPCHECK_SITE_KEY: ''}, 'staging')[0]).toContain(
+      'VITE_APPCHECK_SITE_KEY',
+    );
   });
 
   it('refuses an emulator build', () => {
@@ -23,6 +25,8 @@ describe('findConfigProblems', () => {
   });
 
   it('refuses a build with an App Check debug token', () => {
-    expect(findConfigProblems({...COMPLETE, VITE_APPCHECK_DEBUG_TOKEN: 'token'}, 'staging')[0]).toContain('debug token');
+    expect(findConfigProblems({...COMPLETE, VITE_APPCHECK_DEBUG_TOKEN: 'token'}, 'staging')[0]).toContain(
+      'debug token',
+    );
   });
 });

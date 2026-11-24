@@ -1,6 +1,6 @@
 /** The two sides of the war, each with its own vehicles and instructors. */
 export const FACTIONS = ['unsc', 'covenant'] as const;
-export type Faction = typeof FACTIONS[number];
+export type Faction = (typeof FACTIONS)[number];
 
 export const FACTION_NAMES: Record<Faction, string> = {
   unsc: 'UNSC',
@@ -9,7 +9,7 @@ export const FACTION_NAMES: Record<Faction, string> = {
 
 /** Where a vehicle operates, which groups the course list. */
 export const VEHICLE_DOMAINS = ['ground', 'air'] as const;
-export type VehicleDomain = typeof VEHICLE_DOMAINS[number];
+export type VehicleDomain = (typeof VEHICLE_DOMAINS)[number];
 
 export interface Vehicle {
   slug: string;

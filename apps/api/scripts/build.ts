@@ -14,11 +14,15 @@ await build({
   target: 'node26',
   sourcemap: true,
   logLevel: 'info',
-  plugins: [{
-    name: 'external-npm-packages',
-    setup(builder) {
-      // Bare imports, except the workspace's own packages and its `#src/*` subpath imports.
-      builder.onResolve({filter: /^[^./#]/}, ({path}) => (path.startsWith('@hde/') ? undefined : {path, external: true}));
+  plugins: [
+    {
+      name: 'external-npm-packages',
+      setup(builder) {
+        // Bare imports, except the workspace's own packages and its `#src/*` subpath imports.
+        builder.onResolve({filter: /^[^./#]/}, ({path}) =>
+          path.startsWith('@hde/') ? undefined : {path, external: true},
+        );
+      },
     },
-  }],
+  ],
 });

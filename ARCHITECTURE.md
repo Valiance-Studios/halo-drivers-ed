@@ -55,11 +55,12 @@ flowchart LR
 ### Tech Stack
 
 - **Monorepo** with npm workspaces: `apps/web`, `apps/api`, `packages/shared`.
-- **Web**: Vue 3 (Options API) + TypeScript, PrimeVue 4 (Aura theme, components auto-imported), Pinia, Vue Router, SCSS with BEM class names, Vite.
+- **Web**: Vue 3 (Options API) + TypeScript, PrimeVue 4 (Aura theme, components auto-imported), Pinia, Vue Router, SCSS with BEM class names, Vite (through Vite+).
 - **API**: Node 26 + TypeScript, Hono on `@hono/node-server`, Drizzle ORM and drizzle-kit migrations, `pg`, Firebase Admin SDK (token verification only). Run from source with Node's type stripping in development; bundled with esbuild for the container.
 - **Shared**: the API's request and response types and constants (`@hde/shared`), imported as TypeScript source by both apps.
 - **Data**: PostgreSQL 18; Neon in production, Docker Compose locally.
-- **Tests**: Vitest (unit, and database tests against local Postgres), Playwright (E2E against the Auth emulator, a local API and the database), ESLint.
+- **Tests**: Vitest (unit, and database tests against local Postgres), Playwright (E2E against the Auth emulator, a local API and the database).
+- **Tooling**: Vite+ (`vite-plus`), which bundles Vite, Vitest, Oxlint and Oxfmt; configured in the root `vite.config.ts` and `apps/web/vite.config.ts`. ESLint runs only `eslint-plugin-vue`, on Vue components.
 
 TypeScript is pinned to 6.x: TypeScript 7 (native compiler) does not expose the JS compiler API `vue-tsc` needs.
 
@@ -187,7 +188,7 @@ flowchart LR
     registry --> job["Cloud Run job hde-migrate<br/>node dist/release.js<br/>(migrate, seed catalog)"]
     job -- "succeeded" --> service["Cloud Run service hde-api<br/>node dist/server.js"]
     web([npm run deploy:web]) --> check["check-firebase-config.ts<br/>staging"]
-    check --> vite["vite build --mode staging"]
+    check --> vite["vp build --mode staging"]
     vite --> hosting["Firebase Hosting"]
 ```
 
@@ -236,7 +237,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### Done
 
-- Monorepo scaffold: web (Vue 3 Options API, PrimeVue 4, Pinia, Router), API (Hono, Drizzle), shared types; ESLint, Vitest, Playwright, CI.
+- Monorepo scaffold: web (Vue 3 Options API, PrimeVue 4, Pinia, Router), API (Hono, Drizzle), shared types; Vite+ (Vite, Vitest, Oxlint, Oxfmt), ESLint for Vue components, Playwright, CI.
 - Google sign-in with the allowlist held by the API (`GET /api/me`), and a route guard.
 - API with App Check and ID token checks, JSON errors, and a config that refuses unsafe settings on Cloud Run.
 - Postgres schema and first migration: vehicles, prerequisites, instructors, who teaches what, allowlist. Seeded catalog of 10 vehicles and 6 instructors.

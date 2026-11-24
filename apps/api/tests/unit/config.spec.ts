@@ -1,11 +1,16 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it} from 'vite-plus/test';
 import {loadConfig} from '#src/config.ts';
 
 const LOCAL = {DATABASE_URL: 'postgres://localhost/db', FIREBASE_PROJECT_ID: 'demo-x'};
 
 describe('loadConfig', () => {
   it('requires App Check unless told otherwise', () => {
-    expect(loadConfig(LOCAL)).toEqual({port: 8080, databaseUrl: LOCAL.DATABASE_URL, firebaseProjectId: 'demo-x', appCheck: 'required'});
+    expect(loadConfig(LOCAL)).toEqual({
+      port: 8080,
+      databaseUrl: LOCAL.DATABASE_URL,
+      firebaseProjectId: 'demo-x',
+      appCheck: 'required',
+    });
   });
 
   it('allows App Check to be turned off locally', () => {
@@ -26,6 +31,8 @@ describe('loadConfig', () => {
   });
 
   it('refuses to trust the Auth emulator on Cloud Run', () => {
-    expect(() => loadConfig({...LOCAL, K_SERVICE: 'hde-api', FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099'})).toThrow('emulator');
+    expect(() => loadConfig({...LOCAL, K_SERVICE: 'hde-api', FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099'})).toThrow(
+      'emulator',
+    );
   });
 });
