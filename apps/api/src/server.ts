@@ -4,9 +4,11 @@ import {loadConfig} from '#src/config.ts';
 import {createFirebaseTokenVerifier} from '#src/auth/tokenVerifier.ts';
 import {BookingService} from '#src/bookings/bookingService.ts';
 import {connect} from '#src/db/client.ts';
+import {LessonService} from '#src/lessons/lessonService.ts';
 import {PostgresAllowlistRepository} from '#src/repositories/allowlistRepository.ts';
 import {PostgresBookingRepository} from '#src/repositories/bookingRepository.ts';
 import {PostgresCatalogRepository} from '#src/repositories/catalogRepository.ts';
+import {PostgresLessonRepository} from '#src/repositories/lessonRepository.ts';
 
 const config = loadConfig();
 const {db, close} = connect(config.databaseUrl);
@@ -19,6 +21,7 @@ const app = createApp({
   allowlist: new PostgresAllowlistRepository(db),
   catalog,
   bookings: new BookingService(new PostgresBookingRepository(db), catalog),
+  lessons: new LessonService(new PostgresLessonRepository(db), catalog),
 });
 
 const server = serve({fetch: app.fetch, port: config.port}, ({port}) => {

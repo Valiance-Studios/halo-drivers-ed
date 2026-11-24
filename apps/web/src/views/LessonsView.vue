@@ -17,10 +17,24 @@
       <LessonList
         v-if="upcoming.length > 0"
         :lessons="upcoming"
-        :now="now"
-        :cancelling-id="cancellingId"
-        @cancel="cancel"
-      />
+      >
+        <template #actions="{lesson}">
+          <Button
+            v-if="canCancel(lesson, now)"
+            label="Cancel lesson"
+            severity="secondary"
+            outlined
+            :loading="cancellingId === lesson.id"
+            @click="cancel(lesson.id)"
+          />
+          <span
+            v-else
+            class="lessons__muted"
+          >
+            Too late to cancel
+          </span>
+        </template>
+      </LessonList>
       <p v-else>
         You have no lessons booked.
         <RouterLink :to="{name: 'courses'}">Choose a course</RouterLink>
@@ -28,11 +42,29 @@
       </p>
       <template v-if="past.length > 0">
         <h2 class="lessons__subheading">Past and cancelled</h2>
-        <LessonList
-          :lessons="past"
-          :now="now"
-        />
+        <LessonList :lessons="past">
+          <template #actions="{lesson}">
+            <Button
+              v-if="lesson.lessonNumber !== null"
+              label="See results"
+              severity="secondary"
+              outlined
+              @click="resultsId = lesson.id"
+            />
+            <span
+              v-else-if="lesson.status === 'booked'"
+              class="lessons__muted"
+            >
+              Awaiting the instructor
+            </span>
+          </template>
+        </LessonList>
       </template>
+      <LessonResults
+        v-if="resultsId"
+        :lesson-id="resultsId"
+        @close="resultsId = ''"
+      />
     </template>
   </section>
 </template>
@@ -42,16 +74,18 @@ import type {Booking} from '@hde/shared';
 
 import {defineComponent} from 'vue';
 import {mapStores} from 'pinia';
+import {canCancel} from '@hde/shared';
 import {useBookingsStore} from '@/stores/bookings';
 import {useCatalogStore} from '@/stores/catalog';
 import LessonList from '@/components/LessonList.vue';
+import LessonResults from '@/components/LessonResults.vue';
 
 /** The student's lessons: what is coming up, and the rest. */
 export default defineComponent({
   name: 'LessonsView',
-  components: {LessonList},
+  components: {LessonList, LessonResults},
   data() {
-    return {now: new Date(), cancellingId: '', cancelError: ''};
+    return {now: new Date(), cancellingId: '', cancelError: '', resultsId: ''};
   },
   computed: {
     ...mapStores(useBookingsStore, useCatalogStore),
@@ -74,6 +108,7 @@ export default defineComponent({
     void this.bookingsStore.load();
   },
   methods: {
+    canCancel,
     isUpcoming({status, endsAt}: Booking): boolean {
       return status === 'booked' && new Date(endsAt) > this.now;
     },
@@ -108,6 +143,10 @@ export default defineComponent({
   &__subheading {
     margin: 1.75rem 0 1rem;
     font-size: 1.6875rem;
+  }
+
+  &__muted {
+    color: var(--app-muted);
   }
 
   &__spinner {

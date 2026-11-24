@@ -1,11 +1,16 @@
 import type {
+  AdminLesson,
   ApiErrorBody,
   ApiErrorCode,
   Booking,
   BookingRequest,
+  CourseLesson,
   Instructor,
+  LessonForm,
+  LessonSignOff,
   LessonSlot,
   Me,
+  SkillMark,
   Vehicle,
 } from '@hde/shared';
 
@@ -75,12 +80,47 @@ export class ApiClient {
     return this.post(`/bookings/${encodeURIComponent(id)}/cancel`);
   }
 
+  listCurriculum(): Promise<CourseLesson[]> {
+    return this.get('/curriculum');
+  }
+
+  /** The student's own results in a lesson that has been signed off. */
+  getResults(id: string): Promise<LessonForm> {
+    return this.get(`/bookings/${encodeURIComponent(id)}/form`);
+  }
+
+  /** For admins: one instructor's lessons, or everyone's. */
+  listLessons(instructorSlug: string | null): Promise<AdminLesson[]> {
+    return this.get(`/admin/lessons${instructorSlug ? `?${new URLSearchParams({instructor: instructorSlug})}` : ''}`);
+  }
+
+  getLesson(id: string): Promise<AdminLesson> {
+    return this.get(`/admin/lessons/${encodeURIComponent(id)}`);
+  }
+
+  getLessonForm(id: string): Promise<LessonForm> {
+    return this.get(`/admin/lessons/${encodeURIComponent(id)}/form`);
+  }
+
+  /** Saves one skill's mark; null clears it. */
+  markSkill(id: string, skillId: string, mark: SkillMark): Promise<SkillMark> {
+    return this.put(`/admin/lessons/${encodeURIComponent(id)}/results/${encodeURIComponent(skillId)}`, mark);
+  }
+
+  signOffLesson(id: string, signOff: LessonSignOff): Promise<AdminLesson> {
+    return this.put(`/admin/lessons/${encodeURIComponent(id)}/sign-off`, signOff);
+  }
+
   private get<T>(path: string): Promise<T> {
     return this.send(path);
   }
 
   private post<T>(path: string, body: unknown = {}): Promise<T> {
     return this.send(path, {method: 'POST', body: JSON.stringify(body)});
+  }
+
+  private put<T>(path: string, body: unknown): Promise<T> {
+    return this.send(path, {method: 'PUT', body: JSON.stringify(body)});
   }
 
   private async send<T>(path: string, init: {method?: string; body?: string} = {}): Promise<T> {

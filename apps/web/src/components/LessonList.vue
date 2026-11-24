@@ -18,59 +18,36 @@
           {{ lessonDayAndTime(lesson.startsAt) }}
         </p>
         <p class="lesson-list__line lesson-list__line--muted">
-          With {{ catalogStore.instructorName(lesson.instructorSlug) }}
+          With {{ catalogStore.instructorName(lesson.instructorSlug)
+          }}<template v-if="'studentEmail' in lesson">, for {{ lesson.studentName ?? lesson.studentEmail }}</template>
         </p>
       </div>
       <span class="lesson-list__status">{{ statusNames[lesson.status] }}</span>
-      <template v-if="lesson.status === 'booked'">
-        <Button
-          v-if="canCancel(lesson, now)"
-          label="Cancel lesson"
-          severity="secondary"
-          outlined
-          :loading="cancellingId === lesson.id"
-          @click="$emit('cancel', lesson.id)"
-        />
-        <p
-          v-else
-          class="lesson-list__line lesson-list__line--muted"
-        >
-          {{ new Date(lesson.startsAt) > now ? 'Too late to cancel' : 'Awaiting the instructor' }}
-        </p>
-      </template>
+      <slot
+        name="actions"
+        :lesson="lesson"
+      />
     </li>
   </ul>
 </template>
 
 <script lang="ts">
 import type {PropType} from 'vue';
-import type {Booking, BookingStatus} from '@hde/shared';
+import type {AdminLesson, Booking} from '@hde/shared';
 
 import {defineComponent} from 'vue';
 import {mapStores} from 'pinia';
-import {canCancel} from '@hde/shared';
 import {useCatalogStore} from '@/stores/catalog';
+import {STATUS_NAMES} from '@/utils/lessonStatus';
 import {lessonDayAndTime} from '@/utils/lessonTime';
 import SubjectArt from '@/components/SubjectArt.vue';
 
-const STATUS_NAMES: Record<BookingStatus, string> = {
-  booked: 'Booked',
-  completed: 'Completed',
-  missed: 'Missed',
-  cancelled: 'Cancelled',
-};
-
-/** A student's lessons, which they can cancel with enough notice. */
+/** Lessons, with whatever actions the page gives each one. */
 export default defineComponent({
   name: 'LessonList',
   components: {SubjectArt},
   props: {
-    lessons: {type: Array as PropType<Booking[]>, required: true},
-    now: {type: Date, required: true},
-    cancellingId: {type: String, default: ''},
-  },
-  emits: {
-    cancel: (id: string) => id.length > 0,
+    lessons: {type: Array as PropType<(Booking | AdminLesson)[]>, required: true},
   },
   data() {
     return {statusNames: STATUS_NAMES};
@@ -78,7 +55,7 @@ export default defineComponent({
   computed: {
     ...mapStores(useCatalogStore),
   },
-  methods: {canCancel, lessonDayAndTime},
+  methods: {lessonDayAndTime},
 });
 </script>
 

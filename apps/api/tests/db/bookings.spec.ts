@@ -35,6 +35,8 @@ const lesson = (overrides: Partial<NewBooking & {status: BookingStatus}> = {}) =
   ...overrides,
 });
 
+const COMPLETED = {status: 'completed' as const, lessonNumber: 1, signedOffBy: OTHER, signedOffAt: NOW};
+
 async function constraint(query: Promise<unknown>): Promise<string | undefined> {
   const error = await query.then(
     () => null,
@@ -154,10 +156,10 @@ describe('BookingService', () => {
 
   it('locks a course until every lesson of its prerequisite is completed', async () => {
     const warthog = {vehicleSlug: 'warthog', instructorSlug: 'master-chief', startsAt: at(9, 12).toISOString()};
-    await db.insert(bookings).values(lesson({startsAt: at(1, 12), endsAt: at(1, 13), status: 'completed'}));
+    await db.insert(bookings).values({...lesson({startsAt: at(1, 12), endsAt: at(1, 13)}), ...COMPLETED});
     expect(await errorCode(service.book(STUDENT, warthog))).toBe('course-locked');
 
-    await db.insert(bookings).values(lesson({startsAt: at(2, 12), endsAt: at(2, 13), status: 'completed'}));
+    await db.insert(bookings).values({...lesson({startsAt: at(2, 12), endsAt: at(2, 13)}), ...COMPLETED});
     expect(await errorCode(service.book(STUDENT, warthog))).toBeUndefined();
   });
 

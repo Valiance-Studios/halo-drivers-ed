@@ -1,8 +1,10 @@
 import type {Page} from '@playwright/test';
 import type {EmulatorAccount} from '../../../scripts/emulator-admin.ts';
 
-/** Seeded by globalSetup; ALLOWED_USER is on the allowlist, UNKNOWN_USER is not. */
+/** Seeded by globalSetup; ALLOWED_USER is an admin and UNKNOWN_USER is not on the allowlist. */
 export const ALLOWED_USER: EmulatorAccount = {email: 'cadet@example.com', displayName: 'Cadet Example'};
+/** A student with two Mongoose lessons waiting to be signed off. */
+export const STUDENT_USER: EmulatorAccount = {email: 'pilot@example.com', displayName: 'Pilot Example'};
 export const UNKNOWN_USER: EmulatorAccount = {email: 'stranger@example.com', displayName: 'Sam Stranger'};
 
 /** Signs in by picking the seeded account in the Auth emulator's Google account chooser. */

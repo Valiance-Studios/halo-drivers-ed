@@ -42,6 +42,9 @@ export const useAuthStore = defineStore('auth', {
     isAllowed: false,
     errorMessage: null,
   }),
+  getters: {
+    isAdmin: (state): boolean => state.user?.role === 'admin',
+  },
   actions: {
     /** Resolves once the initial auth state is known; safe to call repeatedly. */
     init(): Promise<void> {

@@ -42,6 +42,13 @@
           >
             My lessons
           </RouterLink>
+          <RouterLink
+            v-if="authStore.isAdmin"
+            class="app__link"
+            :to="{name: 'schedule'}"
+          >
+            Schedule
+          </RouterLink>
         </nav>
         <div class="app__actions">
           <FactionToggle />
@@ -70,6 +77,7 @@ import {defineComponent} from 'vue';
 import {mapStores} from 'pinia';
 import {useAuthStore} from '@/stores/auth';
 import {useBookingsStore} from '@/stores/bookings';
+import {useViewAsStore} from '@/stores/viewAs';
 import FactionToggle from '@/components/FactionToggle.vue';
 import ThemeToggle from '@/components/ThemeToggle.vue';
 
@@ -77,12 +85,13 @@ export default defineComponent({
   name: 'App',
   components: {FactionToggle, ThemeToggle},
   computed: {
-    ...mapStores(useAuthStore, useBookingsStore),
+    ...mapStores(useAuthStore, useBookingsStore, useViewAsStore),
   },
   watch: {
-    /** Forgets one account's lessons before another signs in. */
+    /** Forgets one account's lessons and view before another signs in. */
     'authStore.user.uid'() {
       this.bookingsStore.$reset();
+      this.viewAsStore.$reset();
     },
     'authStore.isAllowed'(isAllowed: boolean) {
       if (!isAllowed && !this.$route.meta.public) {

@@ -2,6 +2,7 @@ import type {Config} from '#src/config.ts';
 import type {TokenVerifier} from '#src/auth/tokenVerifier.ts';
 import type {BookingService} from '#src/bookings/bookingService.ts';
 import type {SignedInEnv} from '#src/http/signedIn.ts';
+import type {LessonService} from '#src/lessons/lessonService.ts';
 import type {AllowlistRepository} from '#src/repositories/allowlistRepository.ts';
 import type {CatalogRepository} from '#src/repositories/catalogRepository.ts';
 
@@ -9,6 +10,7 @@ import {Hono} from 'hono';
 import {createMiddleware} from 'hono/factory';
 import {APP_CHECK_HEADER} from '@hde/shared';
 import {bookingRoutes} from '#src/http/bookingRoutes.ts';
+import {adminLessonRoutes, lessonRoutes} from '#src/http/lessonRoutes.ts';
 import {ApiError} from '#src/http/errors.ts';
 
 export interface AppDependencies {
@@ -17,6 +19,7 @@ export interface AppDependencies {
   allowlist: AllowlistRepository;
   catalog: CatalogRepository;
   bookings: BookingService;
+  lessons: LessonService;
 }
 
 const BEARER_PREFIX = 'Bearer ';
@@ -25,7 +28,7 @@ const BEARER_PREFIX = 'Bearer ';
  * The HTTP API. Every route under /api except the health check needs a valid App Check token (unless
  * turned off for the emulators), a Firebase ID token, and an account on the allowlist.
  */
-export function createApp({appCheck, verifier, allowlist, catalog, bookings}: AppDependencies): Hono {
+export function createApp({appCheck, verifier, allowlist, catalog, bookings, lessons}: AppDependencies): Hono {
   const requireSignedIn = createMiddleware<SignedInEnv>(async (c, next) => {
     if (appCheck === 'required') {
       const appCheckToken = c.req.header(APP_CHECK_HEADER);
@@ -44,9 +47,10 @@ export function createApp({appCheck, verifier, allowlist, catalog, bookings}: Ap
     }
 
     let email: string | null;
+    let displayName: string | null;
 
     try {
-      ({email} = await verifier.verifyIdToken(authorization.slice(BEARER_PREFIX.length)));
+      ({email, displayName} = await verifier.verifyIdToken(authorization.slice(BEARER_PREFIX.length)));
     } catch {
       throw new ApiError(401, 'unauthenticated', 'Your sign-in has expired or is invalid. Sign in again.');
     }
@@ -58,15 +62,27 @@ export function createApp({appCheck, verifier, allowlist, catalog, bookings}: Ap
     }
 
     c.set('me', {email: email.toLowerCase(), role});
+    c.set('displayName', displayName);
     await next();
   });
 
   const signedIn = new Hono<SignedInEnv>()
     .use(requireSignedIn)
-    .get('/me', (c) => c.json(c.var.me))
+    .get('/me', async (c) => {
+      const {me, displayName} = c.var;
+
+      if (displayName) {
+        await allowlist.rememberName(me.email, displayName);
+      }
+
+      return c.json(me);
+    })
     .get('/vehicles', async (c) => c.json(await catalog.listVehicles()))
     .get('/instructors', async (c) => c.json(await catalog.listInstructors()))
-    .route('/', bookingRoutes(bookings));
+    .get('/curriculum', async (c) => c.json(await catalog.listCurriculum()))
+    .route('/', bookingRoutes(bookings))
+    .route('/', lessonRoutes(lessons))
+    .route('/admin', adminLessonRoutes(lessons));
 
   const app = new Hono();
 

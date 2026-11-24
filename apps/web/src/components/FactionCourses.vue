@@ -25,6 +25,11 @@
       @close="booking = false"
       @booked="onBooked"
     />
+    <LessonPlan
+      v-if="vehicle"
+      :key="vehicle.slug"
+      :lessons="catalogStore.lessonsOf(vehicle.slug)"
+    />
     <h2 class="faction-courses__heading">Instructors</h2>
     <InstructorList :instructors="catalogStore.instructorsOf(faction)" />
   </div>
@@ -41,13 +46,14 @@ import {useProgressStore} from '@/stores/progress';
 import {lessonDayAndTime} from '@/utils/lessonTime';
 import BookingDialog from '@/components/BookingDialog.vue';
 import InstructorList from '@/components/InstructorList.vue';
+import LessonPlan from '@/components/LessonPlan.vue';
 import VehicleDetail from '@/components/VehicleDetail.vue';
 import VehicleRoute from '@/components/VehicleRoute.vue';
 
 /** One faction's route map, the selected vehicle's course, and the instructors. */
 export default defineComponent({
   name: 'FactionCourses',
-  components: {BookingDialog, InstructorList, VehicleDetail, VehicleRoute},
+  components: {BookingDialog, InstructorList, LessonPlan, VehicleDetail, VehicleRoute},
   props: {
     faction: {type: String as PropType<Faction>, required: true},
   },

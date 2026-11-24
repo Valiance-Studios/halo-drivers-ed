@@ -31,9 +31,17 @@ export interface BookingRepository {
 /** Postgres's code for a violated exclusion constraint. */
 const EXCLUSION_VIOLATION = '23P01';
 
-type BookingRow = typeof bookings.$inferSelect;
+export type BookingRow = typeof bookings.$inferSelect;
 
-function toBooking({id, vehicleSlug, instructorSlug, startsAt, endsAt, status}: BookingRow): Booking {
+export function toBooking({
+  id,
+  vehicleSlug,
+  instructorSlug,
+  startsAt,
+  endsAt,
+  status,
+  lessonNumber,
+}: BookingRow): Booking {
   return {
     id,
     vehicleSlug,
@@ -41,6 +49,7 @@ function toBooking({id, vehicleSlug, instructorSlug, startsAt, endsAt, status}: 
     startsAt: startsAt.toISOString(),
     endsAt: endsAt.toISOString(),
     status,
+    lessonNumber,
   };
 }
 
