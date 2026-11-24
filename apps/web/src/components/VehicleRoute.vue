@@ -1,0 +1,189 @@
+<template>
+  <div
+    class="vehicle-route"
+    :style="{'--rows': layout.rows}"
+  >
+    <svg
+      class="vehicle-route__lines"
+      :viewBox="viewBox"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <path
+        class="road road--base"
+        :d="layout.path"
+      />
+      <path
+        class="road road--lane"
+        :d="layout.path"
+      />
+    </svg>
+    <button
+      v-for="{vehicle, x, y} in layout.stops"
+      :key="vehicle.slug"
+      type="button"
+      class="vehicle-route__stop"
+      :class="{'vehicle-route__stop--selected': vehicle.slug === selected}"
+      :style="{'--x': `${x * 100}%`, '--y': `${y * 100}%`, '--columns': columns}"
+      :aria-pressed="vehicle.slug === selected"
+      @click="$emit('select', vehicle.slug)"
+    >
+      <SubjectArt
+        class="vehicle-route__art"
+        kind="vehicles"
+        :slug="vehicle.slug"
+      />
+      <span class="vehicle-route__name">{{ vehicle.name }}</span>
+      <span class="vehicle-route__meta">
+        <span>{{ domainName(vehicle) }}</span>
+        <span>{{ totalHours(vehicle) }}</span>
+      </span>
+      <span class="vehicle-route__after">{{ afterText(vehicle) }}</span>
+    </button>
+  </div>
+</template>
+
+<script lang="ts">
+import type {PropType} from 'vue';
+import type {Faction, Vehicle} from '@hde/shared';
+import type {RouteLayout} from '@/utils/routeLayout';
+
+import {defineComponent} from 'vue';
+import {mapStores} from 'pinia';
+import {useCatalogStore} from '@/stores/catalog';
+import {layoutRoute, ROUTE_HEIGHT, ROUTE_WIDTH} from '@/utils/routeLayout';
+import {domainName, totalHours} from '@/utils/vehicleText';
+import SubjectArt from '@/components/SubjectArt.vue';
+
+/** A faction's vehicles, joined by their prerequisites. On narrow screens, a list. */
+export default defineComponent({
+  name: 'VehicleRoute',
+  components: {SubjectArt},
+  props: {
+    vehicles: {type: Array as PropType<Vehicle[]>, required: true},
+    faction: {type: String as PropType<Faction>, required: true},
+    selected: {type: String, required: true},
+  },
+  emits: {
+    select: (slug: string) => slug.length > 0,
+  },
+  data() {
+    return {viewBox: `0 0 ${ROUTE_WIDTH} ${ROUTE_HEIGHT}`};
+  },
+  computed: {
+    ...mapStores(useCatalogStore),
+    layout(): RouteLayout {
+      return layoutRoute(this.vehicles, this.faction);
+    },
+    columns(): number {
+      return new Set(this.layout.stops.map(({x}) => x)).size;
+    },
+  },
+  methods: {
+    domainName,
+    totalHours,
+    afterText(vehicle: Vehicle): string {
+      return vehicle.prerequisites.length > 0
+        ? `After ${vehicle.prerequisites.map(this.catalogStore.vehicleName).join(', ')}`
+        : 'Start here';
+    },
+  },
+});
+</script>
+
+<style lang="scss" scoped>
+.vehicle-route {
+  position: relative;
+  height: calc(var(--rows) * 13.5rem);
+
+  &__lines {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  &__stop {
+    position: absolute;
+    top: var(--y);
+    left: var(--x);
+    width: min(14.25rem, 84% / var(--columns));
+    padding: 0.875rem 1.125rem;
+    background: var(--app-surface);
+    border: 2px solid var(--app-line);
+    border-radius: var(--app-node-radius);
+    color: var(--app-text);
+    cursor: pointer;
+    font-size: inherit;
+    line-height: inherit;
+    text-align: left;
+    transform: translate(-50%, -50%);
+
+    &:hover {
+      border-color: var(--app-primary);
+    }
+
+    &:focus-visible {
+      outline: 3px solid var(--app-accent);
+      outline-offset: 3px;
+    }
+
+    &--selected {
+      background: var(--app-primary);
+      border-color: var(--app-primary);
+      box-shadow: var(--app-node-selected-shadow);
+      color: var(--app-on-primary);
+    }
+  }
+
+  &__art {
+    width: 100%;
+    height: 4.5rem;
+    margin-bottom: 0.625rem;
+  }
+
+  &__name {
+    display: block;
+    font-family: var(--app-font-display);
+    font-size: 1.5rem;
+    font-weight: var(--app-display-weight);
+    line-height: 1.1;
+  }
+
+  &__meta {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.5rem;
+  }
+
+  &__after {
+    display: none;
+  }
+
+  &__stop:not(&__stop--selected) &__meta,
+  &__stop:not(&__stop--selected) &__after {
+    color: var(--app-muted);
+  }
+
+  @media (max-width: 52rem) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    height: auto;
+
+    &__lines {
+      display: none;
+    }
+
+    &__stop {
+      position: static;
+      width: 100%;
+      transform: none;
+    }
+
+    &__after {
+      display: block;
+    }
+  }
+}
+</style>

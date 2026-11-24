@@ -1,20 +1,31 @@
 # UI
 
-The pages use PrimeVue's Aura theme with a teal primary color, a placeholder until the design pass (see [Project Status](../ARCHITECTURE.md#project-status)). Any artwork must be original: no official Halo logos or images.
+Any artwork must be original: no official Halo logos or images.
+
+## Themes
+
+The app wears a **UNSC** look (green with orange accents, square corners, road-sign type) or a **Covenant** look (purple with a plasma-blue accent, asymmetric curves), each in light and dark mode. The tokens are in `apps/web/src/styles/themes.scss`, and PrimeVue's Aura preset reads its colors from them. How a theme is applied is under [Theming](../ARCHITECTURE.md#theming).
+
+The theme is separate from the courses shown: changing it does not change the selected tab.
+
+## Artwork
+
+The vehicle and instructor pictures are **placeholders**, simple original drawings to be replaced. Each is found by slug in `apps/web/src/assets/artwork/vehicles` (2:1) and `apps/web/src/assets/artwork/instructors` (6:7), as SVG, WebP or PNG. To change one, replace its file; no code changes. A subject without a file shows no picture. The faction emblems (`FactionEmblem.vue`) are original too.
 
 ## App Bar
 
-The app name (links to Courses), the light/dark toggle, and, when signed in, the account's name and **Sign out**. The theme follows the system setting until the toggle is used; the choice is then remembered in this browser (`localStorage`).
+The app name (links to Courses), two circular toggles and, when signed in, the account's name and **Sign out**. One toggle switches between the UNSC and Covenant themes and shows the emblem of the theme it switches to; the other switches between light and dark. UNSC is the default, and light or dark follows the system setting until its toggle is used. Both choices are remembered in this browser (`localStorage`).
 
 ## Login (`/login`)
 
-A card with **Sign in with Google**. An account that is not on the allowlist is signed out again, with "This Google account is not authorized to use this app." Signed-out visitors to any other page land here, and return to that page after signing in.
+A heading, the theme's road and vehicle (Warthog or Ghost), and a card with **Sign in with Google**. An account that is not on the allowlist is signed out again, with "This Google account is not authorized to use this app." Signed-out visitors to any other page land here, and return to that page after signing in.
 
 ## Courses (`/courses`)
 
-Tabs for **UNSC** and **Covenant**. Each tab shows:
+Tabs for **UNSC** and **Covenant**, opening on the theme's faction. Each tab shows:
 
-- **Vehicles**: a card per vehicle with its name, Ground or Air tag, a short description, the course length (lessons × minutes, and total hours), the prerequisite courses, and the instructors who teach it. Ordered shortest course first.
-- **Instructors**: each instructor's initials, name, title and bio.
+- **Route map**: the vehicles joined by their prerequisites, left to right, each with its picture, name, Ground or Air, and total hours. UNSC routes are angled roads and Covenant routes are curves. On narrow screens it is a list that names each prerequisite.
+- **Selected vehicle**: its picture, description, course length, prerequisite courses and instructors. The first vehicle is selected to begin with; selecting another scrolls this into view if needed.
+- **Instructors**: each instructor's picture, name, title and bio.
 
 The catalog loads once per visit; a failure shows an error message in place of the tabs.

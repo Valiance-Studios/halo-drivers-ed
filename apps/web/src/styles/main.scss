@@ -1,18 +1,61 @@
 // Global styles. Component styles are scoped and use BEM class names.
+@use 'themes';
 
 :root {
-  --app-max-width: 72rem;
-  --app-gutter: 1rem;
+  --app-max-width: 77rem;
+  --app-gutter: 1.5rem;
+
+  @media (max-width: 52rem) {
+    --app-gutter: 1rem;
+  }
 }
 
 html {
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--app-font-body);
+  color-scheme: light;
+
+  &.app-dark {
+    color-scheme: dark;
+  }
 }
 
 body {
   margin: 0;
-  background: var(--p-content-background);
-  color: var(--p-text-color);
+  background: var(--app-bg);
+  color: var(--app-text);
+  font-size: 1.0625rem;
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--app-font-display);
+  font-weight: var(--app-display-weight);
+  line-height: 1.1;
+  text-wrap: balance;
+}
+
+button {
+  font-family: inherit;
+}
+
+// The lines between vehicles: a road with a lane marking (UNSC), or a conduit with a glowing core (Covenant).
+.road {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+
+  &--base {
+    stroke: var(--app-road);
+    stroke-width: var(--app-road-width);
+  }
+
+  &--lane {
+    stroke: var(--app-accent);
+    stroke-width: var(--app-lane-width);
+    stroke-dasharray: var(--app-lane-dash);
+  }
 }
 
 *,

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140">
+  <!-- Original placeholder drawing, not a game file. -->
+  <path fill="#8B949E" d="M8 140V114L42 98H78L112 114V140z" />
+  <path fill="#D3A283" d="M40 44H80V64C80 80 70 92 60 92C50 92 40 80 40 64zM51 86H69V100L60 108L51 100z" />
+  <path fill="#3A2A24" d="M34 74C28 30 46 16 60 16C76 16 92 30 86 74L80 80V50C70 48 60 42 56 36C52 44 46 50 40 52V80zM46 60h9v3h-9zM65 60h9v3h-9zM53 79h14v2h-14z" />
+</svg>

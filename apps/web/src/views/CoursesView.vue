@@ -1,6 +1,7 @@
 <template>
   <section class="courses">
     <h1 class="courses__heading">Courses</h1>
+    <p class="courses__lead">Each course opens the next one along its route.</p>
     <Message
       v-if="catalogStore.errorMessage"
       severity="error"
@@ -15,6 +16,7 @@
     <Tabs
       v-else
       v-model:value="faction"
+      lazy
     >
       <TabList>
         <Tab
@@ -31,18 +33,7 @@
           :key="option"
           :value="option"
         >
-          <h2 class="courses__subheading">Vehicles</h2>
-          <div class="courses__grid">
-            <VehicleCard
-              v-for="vehicle in catalogStore.vehiclesOf(option)"
-              :key="vehicle.slug"
-              :vehicle="vehicle"
-              :prerequisite-names="vehicle.prerequisites.map(catalogStore.vehicleName)"
-              :instructors="catalogStore.instructorsFor(vehicle.slug)"
-            />
-          </div>
-          <h2 class="courses__subheading">Instructors</h2>
-          <InstructorList :instructors="catalogStore.instructorsOf(option)" />
+          <FactionCourses :faction="option" />
         </TabPanel>
       </TabPanels>
     </Tabs>
@@ -50,28 +41,26 @@
 </template>
 
 <script lang="ts">
-import type {Faction} from '@hde/shared';
-
 import {defineComponent} from 'vue';
 import {mapStores} from 'pinia';
 import {FACTION_NAMES, FACTIONS} from '@hde/shared';
 import {useCatalogStore} from '@/stores/catalog';
-import InstructorList from '@/components/InstructorList.vue';
-import VehicleCard from '@/components/VehicleCard.vue';
+import {useThemeStore} from '@/stores/theme';
+import FactionCourses from '@/components/FactionCourses.vue';
 
-/** Every course, by faction: the vehicles, what each requires, and the instructors. */
+/** Every course, by faction: starts on the theme's faction, then keeps the chosen tab. */
 export default defineComponent({
   name: 'CoursesView',
-  components: {InstructorList, VehicleCard},
+  components: {FactionCourses},
   data() {
     return {
-      faction: 'unsc' as Faction,
+      faction: useThemeStore().faction,
       factions: FACTIONS,
       factionNames: FACTION_NAMES,
     };
   },
   computed: {
-    ...mapStores(useCatalogStore),
+    ...mapStores(useCatalogStore, useThemeStore),
   },
   mounted() {
     void this.catalogStore.load();
@@ -82,22 +71,22 @@ export default defineComponent({
 <style lang="scss" scoped>
 .courses {
   &__heading {
-    margin-top: 0.5rem;
+    margin: 0.75rem 0 0;
+    font-size: clamp(2.375rem, 4vw, 2.875rem);
   }
 
-  &__subheading {
-    font-size: 1.125rem;
+  &__lead {
+    margin: 0.375rem 0 1rem;
+    color: var(--app-muted);
+  }
+
+  :deep(.p-tab) {
+    font-size: 1.0625rem;
   }
 
   &__spinner {
     display: block;
     margin: 3rem auto;
-  }
-
-  &__grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
-    gap: 1rem;
   }
 }
 </style>
