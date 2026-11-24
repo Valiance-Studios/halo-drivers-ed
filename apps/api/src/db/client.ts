@@ -9,7 +9,7 @@ export type Database = NodePgDatabase<typeof schema>;
 export interface DatabaseConnection {
   db: Database;
   /** Closes the pool's connections, for scripts and tests that end. */
-  close(): Promise<void>;
+  close: () => Promise<void>;
 }
 
 /**

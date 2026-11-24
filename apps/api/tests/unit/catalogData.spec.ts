@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it} from 'vite-plus/test';
 import {INSTRUCTORS, VEHICLES} from '#src/db/catalogData.ts';
 
 const vehiclesBySlug = new Map(VEHICLES.map((vehicle) => [vehicle.slug, vehicle]));

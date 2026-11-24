@@ -9,7 +9,7 @@
  * usable without credentials, since it is also the project's type and bundle check.
  */
 import {fileURLToPath} from 'node:url';
-import {loadEnv} from 'vite';
+import {loadEnv} from 'vite-plus';
 
 const WEB_APP_DIR = fileURLToPath(new URL('../apps/web', import.meta.url));
 

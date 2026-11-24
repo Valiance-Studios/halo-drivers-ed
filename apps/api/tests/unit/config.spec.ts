@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it} from 'vite-plus/test';
 import {loadConfig} from '#src/config.ts';
 
 const LOCAL = {DATABASE_URL: 'postgres://localhost/db', FIREBASE_PROJECT_ID: 'demo-x'};

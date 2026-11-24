@@ -41,7 +41,9 @@ Conventions are in [CLAUDE.md](../CLAUDE.md#environment-files). In short:
 
 | Command | What it does |
 | --- | --- |
-| `npm run lint` / `lint:fix` | ESLint over the whole repository. |
+| `npm run check` | Formatting and lint together (`vp check`, then ESLint on Vue components), as CI runs them. |
+| `npm run fmt` / `fmt:check` | Oxfmt over the whole repository, except Markdown and generated files. |
+| `npm run lint` / `lint:fix` | Oxlint over the whole repository, then ESLint on Vue components (`lint:vue` runs only the latter). |
 | `npm run type-check` | `vue-tsc --build` over every workspace. |
 | `npm run build` | Type-check, then build the web app (`apps/web/dist`) and the API bundle (`apps/api/dist`). Needs no credentials. |
 | `npm run test:unit` | Vitest unit tests: web (jsdom), API (no database), scripts. |
@@ -62,14 +64,17 @@ Conventions are in [CLAUDE.md](../CLAUDE.md#environment-files). In short:
 
 `.github/workflows/ci.yml` runs on every pull request and push to `main`:
 
-- **checks**: lint, build (with type-check), unit tests.
+- **checks**: formatting and lint, build (with type-check), unit tests.
 - **integration-tests**: a Postgres 18 service container on port 5433 (matching `docker-compose.yml`), then the database and E2E tests. The Playwright report is uploaded on failure.
 
 ## Dependency Decisions
 
 - **PrimeVue 4, not 5.** PrimeVue 5 (July 2026) is no longer MIT-licensed: it needs a PrimeUI license key, and without one it shows a license notice. The free Community License covers individuals and small organizations but must be renewed yearly. PrimeVue 4.5 is MIT. Moving to 5 later means getting a Community key, upgrading `primevue`, `@primevue/auto-import-resolver`, `@primeuix/themes` (3.x) and `primeicons` (8.x), and checking the changelog for API changes.
 - **TypeScript 6.x**: TypeScript 7 does not expose the compiler API `vue-tsc` needs.
-- **`@stylistic/eslint-plugin` 5.x**, matching the other Valiance Studios repositories.
+- **Vite+** (`vite-plus`) replaces separate Vite and Vitest packages, most of ESLint, and ESLint's formatting rules. The npm scripts use the local copy, so neither CI nor other machines need the global `vp`; a global `vp` uses the local copy for `dev`, `build`, `test`, `lint`, `fmt` and `check`. `vite` is an alias for `@voidzero-dev/vite-plus-core`, in both `devDependencies` and `overrides`: to upgrade, change `vite-plus` and both aliases together, to the core version that `vite-plus` depends on.
+- **Oxlint, plus ESLint only for Vue components.** Oxlint reads only the script of a component, so `eslint-plugin-vue` (recommended rules, without the layout ones Oxfmt handles) covers Vue's rules, mainly the template ones such as `vue/require-v-for-key`. Oxlint's own `vue` plugin is off, to avoid duplicates. Remove ESLint (`eslint`, `eslint-plugin-vue`, `typescript-eslint`, `eslint.config.js`) once Oxlint lints templates. Oxlint's type-aware rules and `no-unused-vars` skip components too; `noUnusedLocals` in `apps/web/tsconfig.json` covers the latter through `vue-tsc`, and floating promises in components go unchecked.
+- **`vue-tsc` stays the type checker**: Vite+'s own (`typeCheck`) does not check Vue components.
+- **esbuild stays the API's bundler**, so the API image does not install Vite+.
 - **Install scripts**: all denied in `allowScripts` (npm 12). None are needed: esbuild ships its binary as an optional platform package, and the rest (protobufjs, re2, fsevents, @firebase/util, @parcel/watcher) come from firebase-tools or are optional.
 - **`npm audit`**: production dependencies are clean (`npm audit --omit=dev`). The `@grpc/grpc-js` override lifts a vulnerable copy nested under the Firebase web SDK's Firestore package (unused here). The remaining moderate findings are in dev tooling.
 - **firebase-tools on Node 26** prints an `EBADENGINE` warning for `superstatic` (supports Node 20, 22, 24); it works.

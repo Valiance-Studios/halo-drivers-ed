@@ -7,6 +7,8 @@
     "tsBuildInfoFile": "../../node_modules/.tmp/tsconfig.web.tsbuildinfo",
     "allowImportingTsExtensions": true,
     "noUncheckedIndexedAccess": true,
+    // Oxlint skips its unused variable check in Vue components.
+    "noUnusedLocals": true,
     "types": ["vite/client"],
     "paths": {
       "@/*": ["./src/*"]

@@ -2,7 +2,7 @@ import type {Instructor, Role, Vehicle} from '@hde/shared';
 import type {AppDependencies} from '#src/app.ts';
 import type {TokenVerifier} from '#src/auth/tokenVerifier.ts';
 
-import {describe, expect, it, vi} from 'vitest';
+import {describe, expect, it, vi} from 'vite-plus/test';
 import {createApp} from '#src/app.ts';
 
 const VEHICLE: Vehicle = {

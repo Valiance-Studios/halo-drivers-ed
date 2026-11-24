@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   checks:
-    name: Lint, type-check, build, unit tests
+    name: Format, lint, type-check, build, unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -27,7 +27,7 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run lint
+      - run: npm run check
 
       # Type-checks, then builds the web app (without Firebase config, which only a deploy needs) and the API bundle.
       - run: npm run build

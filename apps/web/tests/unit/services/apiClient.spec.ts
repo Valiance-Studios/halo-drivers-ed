@@ -1,6 +1,6 @@
 import type {TokenSource} from '@/services/apiClient';
 
-import {describe, expect, it, vi} from 'vitest';
+import {describe, expect, it, vi} from 'vite-plus/test';
 import {ApiClient, ApiRequestError} from '@/services/apiClient';
 
 function jsonResponse(status: number, body: unknown): Response {

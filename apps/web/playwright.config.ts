@@ -25,9 +25,7 @@ export default defineConfig({
     baseURL: APP_URL,
     trace: 'on-first-retry',
   },
-  projects: [
-    {name: 'chromium', use: {...devices['Desktop Chrome']}},
-  ],
+  projects: [{name: 'chromium', use: {...devices['Desktop Chrome']}}],
   webServer: [
     {
       command: 'node scripts/with-emulators.ts --keep-running --only auth',
@@ -48,7 +46,7 @@ export default defineConfig({
     },
     {
       // Vite's development mode (.env.development: the emulators), proxying /api to the API above.
-      command: `npx vite --port ${APP_PORT} --strictPort`,
+      command: `npx vp dev --port ${APP_PORT} --strictPort`,
       cwd: `${REPO_ROOT}/apps/web`,
       env: {HDE_API_URL: `http://localhost:${API_PORT}`},
       url: APP_URL,

@@ -1,4 +1,4 @@
-import {defineConfig} from 'vitest/config';
+import {defineConfig} from 'vite-plus';
 
 /**
  * The API's database tests, against the local Postgres (`npm run db:up`) in their own database, which

@@ -1,4 +1,4 @@
-import {afterAll, beforeAll, describe, expect, it} from 'vitest';
+import {afterAll, beforeAll, describe, expect, it} from 'vite-plus/test';
 import {connect} from '#src/db/client.ts';
 import {instructorVehicles, vehiclePrerequisites} from '#src/db/schema.ts';
 import {seedCatalog} from '#src/db/seed.ts';

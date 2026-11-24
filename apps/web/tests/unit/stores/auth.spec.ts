@@ -1,6 +1,6 @@
 import type {User} from 'firebase/auth';
 
-import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {beforeEach, describe, expect, it, vi} from 'vite-plus/test';
 import {createPinia, setActivePinia} from 'pinia';
 import {ApiRequestError} from '@/services/apiClient';
 import {NOT_ALLOWED_MESSAGE, useAuthStore} from '@/stores/auth';

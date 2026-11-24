@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "dev:staging": "vite --mode staging",
-    "build": "vite build",
-    "build:staging": "vite build --mode staging",
-    "preview": "vite preview"
+    "dev": "vp dev",
+    "dev:staging": "vp dev --mode staging",
+    "build": "vp build",
+    "build:staging": "vp build --mode staging",
+    "preview": "vp preview"
   },
   "dependencies": {
     "@hde/shared": "^0.1.0",
