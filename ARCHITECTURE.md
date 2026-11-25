@@ -454,6 +454,7 @@ erDiagram
 - Checks on `bookings` require a signature on signed-off lessons, and a lesson number on attended ones, and limit the notes to 1,000 characters each. Only a cancelled lesson can have a `cancel_reason`.
 - `instructor_time_off` has an exclusion constraint (migration `0008_time_off_exclusion`): an instructor's time off cannot overlap.
 - The catalog (vehicles, instructors, who teaches what) is seed data in `apps/api/src/db/catalogData.ts`, loaded by `npm run db:seed`. Instructors are seeded characters, not accounts.
+- `npm run db:clear` deletes bookings and what hangs off them (`apps/api/src/db/clearData.ts`), under the locks the API takes. It is a command rather than an admin feature so that erasing data needs the database's credentials. See [Clearing Data](docs/DEVELOPMENT.md#clearing-data).
 - Schema changes: edit `apps/api/src/db/schema.ts`, run `npm run db:generate`, and commit the new file in `apps/api/drizzle/`.
 
 ## Deployment
@@ -522,6 +523,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - Booking: instructor hours, lesson times, booking and cancelling, My lessons, and exclusion constraints against double-booking.
 - Lesson plans (53 lessons), instructors' lesson forms, sign-off that unlocks courses, notes and student history (deployed and tried on the site on 2026-11-24), and admins' schedule with View As. Demo guests have the same for their own lessons. Deployed and tried on the site on 2026-11-24.
 - Instructors' [time off](#time-off), and cancelling lessons on their behalf. Deployed and tried on the site on 2026-11-24.
+- `npm run db:clear`, to delete everyone's, a student's or an instructor's data.
 - A `student` role, which can book but not sign off.
 - [Demo](#demo) slots for recruiters: 10 at once, 2 hours each. Deployed and tried on the site on 2026-11-24, including that signing out removes the anonymous account.
 - UNSC and Covenant themes, each light and dark, with placeholder artwork.

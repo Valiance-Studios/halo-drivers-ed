@@ -125,6 +125,25 @@ Deploy the API first: Hosting's `/api` rewrite needs the `hde-api` service to ex
   3. Deploys the `hde-api` service with `DATABASE_URL` from Secret Manager, `APP_CHECK=required`, 0 to 2 instances.
 - **`npm run deploy:web`**: `hosting.predeploy` runs `scripts/check-firebase-config.ts staging` (refuses a missing site key, an emulator build or a debug token), builds with `--mode staging`, then deploys to https://vs-halo-drivers-ed-dev.web.app, with the [security headers](../ARCHITECTURE.md#security-headers) in `firebase.json`. After changing those, sign in on the deployed site and check the browser console: the emulators do not send them.
 
+## Clearing Deployed Data
+
+`npm run db:clear` with `--deployed` clears the Neon database (see [Clearing Data](DEVELOPMENT.md#clearing-data) for what each form deletes). It reads the `hde_app` connection string from Secret Manager through `gcloud`, so you must be signed in to `gcloud` with access to the secret. **There is no undo**, so make a backup first.
+
+1. In the Neon console, create a branch of the main branch, with its current data. That is the backup; delete it once you are sure.
+2. See what would be deleted, and check the counts:
+
+   ```sh
+   npm run db:clear -- student you@example.com --deployed
+   ```
+
+3. Delete it, by running the command that printed:
+
+   ```sh
+   npm run db:clear -- student you@example.com --deployed --confirm deployed
+   ```
+
+`all` ends demos in progress: those visitors are told their demo has ended.
+
 ## Credential Lockdown
 
 Do these before the first deploy. All are done for `vs-halo-drivers-ed-dev`.

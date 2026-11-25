@@ -32,6 +32,7 @@
     "db:seed": "npm run db:seed -w @hde/api",
     "db:reset": "npm run db:reset -w @hde/api",
     "db:allow": "npm run db:allow -w @hde/api --",
+    "db:clear": "npm run db:clear -w @hde/api --",
     "emulators": "node scripts/with-emulators.ts --keep-running --only auth -- node scripts/seed-emulators.ts",
     "emulators:stop": "node scripts/stop-emulators.ts",
     "deploy:web": "firebase deploy --only hosting",
