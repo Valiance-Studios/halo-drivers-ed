@@ -573,6 +573,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - [Rescheduling](#booking) a lesson. Deployed and tried on the site on 2026-11-24.
 - [Certificates](#certificates) for completed courses, and a Ghost lesson in guests' history. Deployed on 2026-11-24.
 - A lesson can no longer be cancelled and signed off at the same time, and API responses are not cached. Not deployed yet.
+- A menu for the app bar on narrow screens, and a footer notice. Not deployed yet.
 - A `student` role, which can book but not sign off.
 - [Demo](#demo) slots for recruiters: 10 at once, 2 hours each. Deployed and tried on the site on 2026-11-24, including that signing out removes the anonymous account.
 - UNSC and Covenant themes, each light and dark, with placeholder artwork.
@@ -589,7 +590,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 ### Next: Decisions (need the owner)
 
 1. PrimeVue 5 (see [Dependency Decisions](docs/DEVELOPMENT.md#dependency-decisions)).
-2. The repository's visibility (private for now). Its history, pull requests and files were reviewed on 2026-11-24 and hold no secrets, and the backend and its GCP settings were reviewed for an attacker who has the code ([Known Limits](#known-limits)). Still to decide: a license (there is none, so all rights are reserved), and that the pull requests' commits show the owner's email address.
+2. The repository's visibility (private for now). Its history, pull requests and files were reviewed on 2026-11-24 and hold no secrets, and the backend and its GCP settings were reviewed for an attacker who has the code ([Known Limits](#known-limits)). The code is under the MIT License. Once public, turn on secret scanning with push protection, branch protection for `main`, and approval for outside contributors' CI runs.
 
 ### Next: Features
 

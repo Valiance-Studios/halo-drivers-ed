@@ -46,6 +46,8 @@ npm run dev          # the web app on :5173 (another terminal)
 
 Open http://localhost:5173 and sign in with **cadet@example.com** from the emulator's account chooser. More in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
-## Disclaimer
+## License and Disclaimer
 
 A non-commercial fan project and portfolio piece, not affiliated with or endorsed by Microsoft. Halo, its characters and its vehicles belong to Microsoft. The app uses no official artwork or logos; its drawings are original.
+
+The source code is available under the [MIT License](LICENSE). It does not cover the drawings in `apps/web/src/assets/artwork`, or Halo names, characters, vehicles or other Microsoft intellectual property, and grants no rights to them.

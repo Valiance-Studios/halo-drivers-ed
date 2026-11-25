@@ -14,7 +14,9 @@ The vehicle and instructor pictures are **placeholders**, simple original drawin
 
 ## App Bar
 
-The app name (links to Courses), links to **Courses**, **My lessons** and (for admins and demo guests) **Schedule** when signed in, two circular toggles and, when signed in, the account's name and **Sign out**. One toggle switches between the UNSC and Covenant themes and shows the emblem of the theme it switches to; the other switches between light and dark. UNSC is the default, and light or dark follows the system setting until its toggle is used. Both choices are remembered in this browser (`localStorage`). On narrow screens the links move to their own row, and the account's name is hidden. During a demo, a notice below the bar says when it ends, and that it cannot be returned to after that or after signing out.
+The app name (links to Courses), links to **Courses**, **My lessons** and (for admins and demo guests) **Schedule** when signed in, two circular toggles and, when signed in, the account's name and **Sign out**. One toggle switches between the UNSC and Covenant themes and shows the emblem of the theme it switches to; the other switches between light and dark. UNSC is the default, and light or dark follows the system setting until its toggle is used. Both choices are remembered in this browser (`localStorage`). On narrow screens the title, the toggles and a menu button share one line. The menu holds the links, the account's name and **Sign out**; it closes when a link is chosen, on Escape, or on a press outside it.
+
+A footer on every page says that this is a fan project, not affiliated with Microsoft. During a demo, a notice below the bar says when it ends, and that it cannot be returned to after that or after signing out.
 
 ## Login (`/login`)
 
