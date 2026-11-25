@@ -476,7 +476,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - Booking: instructor hours, lesson times, booking and cancelling, My lessons, and exclusion constraints against double-booking.
 - Lesson plans (53 lessons), instructors' lesson forms, sign-off that unlocks courses, and admins' schedule with View As.
 - A `student` role, which can book but not sign off.
-- [Demo](#demo) slots for recruiters: 10 at once, 2 hours each.
+- [Demo](#demo) slots for recruiters: 10 at once, 2 hours each. Deployed and tried on the site on 2026-11-24, including that signing out removes the anonymous account.
 - UNSC and Covenant themes, each light and dark, with placeholder artwork.
 - Local development with Docker Postgres and the Auth emulator; unit, database and E2E tests.
 - API image, Cloud Build config and deploy script (migrate job, then service).
@@ -486,7 +486,6 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### To Check
 
-- The demo is not deployed. Enable **Anonymous** sign-in in Firebase first (see [Firebase Authentication](docs/DEPLOYMENT.md#5-firebase-authentication)), deploy the API and then the site, and try it there.
 - The prompt when leaving a lesson form with unsaved marks has no test.
 - Accounts allowlisted before the `student` role existed are admins, who can sign off everyone's lessons. Change others with `npm run db:allow -- <email> student`.
 
