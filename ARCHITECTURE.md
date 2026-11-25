@@ -472,7 +472,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - Courses page: vehicles on a route map of their prerequisites, and instructors, by faction.
 - Locks on courses whose prerequisites are not complete, enforced by the API.
 - Booking: instructor hours, lesson times, booking and cancelling, My lessons, and exclusion constraints against double-booking.
-- Lesson plans (53 lessons), instructors' lesson forms, sign-off that unlocks courses, and admins' schedule with View As. Demo guests have the same for their own lessons.
+- Lesson plans (53 lessons), instructors' lesson forms, sign-off that unlocks courses, and admins' schedule with View As. Demo guests have the same for their own lessons. Deployed and tried on the site on 2026-11-24.
 - A `student` role, which can book but not sign off.
 - [Demo](#demo) slots for recruiters: 10 at once, 2 hours each. Deployed and tried on the site on 2026-11-24, including that signing out removes the anonymous account.
 - UNSC and Covenant themes, each light and dark, with placeholder artwork.
@@ -484,7 +484,6 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### To Check
 
-- Guest sign-off is not deployed. Deploy the API, then the site, and complete the last Warthog lesson in a demo, which should unlock the Scorpion and the Hornet.
 - The prompt when leaving a lesson form with unsaved marks has no test.
 - Accounts allowlisted before the `student` role existed are admins, who can sign off everyone's lessons. Change others with `npm run db:allow -- <email> student`.
 
