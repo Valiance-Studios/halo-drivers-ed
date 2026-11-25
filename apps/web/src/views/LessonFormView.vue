@@ -23,7 +23,7 @@
       </h1>
       <p class="lesson-form__line">
         <strong>{{ lesson.studentName ?? lesson.studentEmail }}</strong>
-        <template v-if="lesson.studentName"> ({{ lesson.studentEmail }})</template>
+        <template v-if="lesson.studentName && !isGuest"> ({{ lesson.studentEmail }})</template>
         with {{ catalogStore.instructorName(lesson.instructorSlug) }},
         {{ lessonDayAndTime(lesson.startsAt) }}
       </p>
@@ -114,12 +114,12 @@
 </template>
 
 <script lang="ts">
-import type {AdminLesson, Attendance, LessonForm, SkillResult, SkillResults} from '@hde/shared';
+import type {AdminLesson, Attendance, LessonForm, SignOffScope, SkillResult, SkillResults} from '@hde/shared';
 import type {MarkState} from '@/utils/markSaver';
 
 import {defineComponent, markRaw} from 'vue';
 import {mapStores} from 'pinia';
-import {allMarked, allPassed} from '@hde/shared';
+import {allMarked, allPassed, isGuestEmail} from '@hde/shared';
 import {api} from '@/services/api';
 import {useAuthStore} from '@/stores/auth';
 import {useCatalogStore} from '@/stores/catalog';
@@ -169,6 +169,14 @@ export default defineComponent({
   },
   computed: {
     ...mapStores(useAuthStore, useCatalogStore),
+    /** The route is only for accounts that have one; signing out leaves the page. */
+    scope(): SignOffScope {
+      return this.authStore.signOffScope ?? 'admin';
+    },
+    /** Guests' addresses are made up, so there is no use showing them. */
+    isGuest(): boolean {
+      return this.lesson !== null && isGuestEmail(this.lesson.studentEmail);
+    },
     isSignedOff(): boolean {
       return this.lesson !== null && this.lesson.status !== 'booked';
     },
@@ -230,7 +238,7 @@ export default defineComponent({
   },
   created() {
     const save = (skillId: string, result: SkillResult | null) =>
-      api.markSkill(this.id, skillId, {result, early: this.early});
+      api.markSkill(this.scope, this.id, skillId, {result, early: this.early});
     this.saver = markRaw(new MarkSaver(save, (skillId, state) => this.setMarkState(skillId, state)));
   },
   mounted() {
@@ -259,7 +267,10 @@ export default defineComponent({
       }
     },
     async refresh() {
-      [this.lesson, this.form] = await Promise.all([api.getLesson(this.id), api.getLessonForm(this.id)]);
+      [this.lesson, this.form] = await Promise.all([
+        api.getLesson(this.scope, this.id),
+        api.getLessonForm(this.scope, this.id),
+      ]);
       this.results = {...this.form.results};
       this.now = new Date();
     },
@@ -291,7 +302,11 @@ export default defineComponent({
       this.notice = '';
 
       try {
-        const {status} = await api.signOffLesson(this.id, {results: this.results, attendance, early: this.early});
+        const {status} = await api.signOffLesson(this.scope, this.id, {
+          results: this.results,
+          attendance,
+          early: this.early,
+        });
         await this.refresh();
         this.hasMarked = false;
         this.notice = `Signed off: ${STATUS_NAMES[status].toLowerCase()}.`;

@@ -4,11 +4,14 @@ import {DEMO_BOOKING_LIMIT, DEMO_SESSION_MINUTES, DEMO_SLOTS} from '@hde/shared'
 import {BookingService} from '#src/bookings/bookingService.ts';
 import {connect} from '#src/db/client.ts';
 import {allowedUsers, bookings, demoSlots, skillResults} from '#src/db/schema.ts';
+import {DEMO_LESSONS} from '#src/demo/demoHistory.ts';
+import {LessonService} from '#src/lessons/lessonService.ts';
 import {seedCatalog, seedDemoSlots} from '#src/db/seed.ts';
 import {PostgresAllowlistRepository} from '#src/repositories/allowlistRepository.ts';
 import {PostgresBookingRepository} from '#src/repositories/bookingRepository.ts';
 import {PostgresCatalogRepository} from '#src/repositories/catalogRepository.ts';
 import {PostgresDemoRepository} from '#src/repositories/demoRepository.ts';
+import {PostgresLessonRepository} from '#src/repositories/lessonRepository.ts';
 import {TEST_DATABASE_URL} from './database.ts';
 
 const {db, close} = connect(TEST_DATABASE_URL, 5);
@@ -57,7 +60,7 @@ describe('demo slots', () => {
     expect(sessions.filter(({claimed}) => !claimed)).toHaveLength(5);
     expect(await demo.claim('late', minutesLater(1))).toEqual({claimed: false, nextFreeAt: endsAt});
     // Every guest has their whole history, so none of them clashed.
-    expect(await db.select().from(bookings)).toHaveLength(DEMO_SLOTS * 3);
+    expect(await db.select().from(bookings)).toHaveLength(DEMO_SLOTS * DEMO_LESSONS.length);
   });
 
   it('gives an account one session, even when it asks twice together', async () => {
@@ -104,7 +107,7 @@ describe('demo slots', () => {
 
     expect(await demo.findGuest('a', NOW)).toBeNull();
     expect(await demo.findGuest('b', NOW)).not.toBeNull();
-    expect(await db.select().from(bookings)).toHaveLength(3);
+    expect(await db.select().from(bookings)).toHaveLength(DEMO_LESSONS.length);
   });
 
   it('clears expired guests and their lessons, and no one else', async () => {
@@ -119,7 +122,9 @@ describe('demo slots', () => {
     await demo.clearExpired(NOW);
 
     expect(await db.select().from(allowedUsers).where(eq(allowedUsers.email, old))).toEqual([]);
-    expect(await db.select().from(bookings).where(eq(bookings.studentEmail, current))).toHaveLength(3);
+    expect(await db.select().from(bookings).where(eq(bookings.studentEmail, current))).toHaveLength(
+      DEMO_LESSONS.length,
+    );
     expect(await demo.findGuest('c', NOW)).not.toBeNull();
   });
 
@@ -132,7 +137,7 @@ describe('demo slots', () => {
 });
 
 describe('guests', () => {
-  it('start with the Mongoose completed, which unlocks the Warthog, and a lesson to repeat', async () => {
+  it('start one lesson short of completing the Warthog, with one lesson repeated', async () => {
     await demo.claim('a', NOW);
     const email = await guestEmail('a');
     const lessons = await new PostgresBookingRepository(db).listForStudent(email);
@@ -140,7 +145,10 @@ describe('guests', () => {
     expect(lessons.map(({vehicleSlug, status}) => [vehicleSlug, status])).toEqual([
       ['mongoose', 'completed'],
       ['mongoose', 'completed'],
+      ['warthog', 'completed'],
+      ['warthog', 'completed'],
       ['warthog', 'repeat'],
+      ['warthog', 'completed'],
     ]);
     expect(await db.select().from(skillResults).where(eq(skillResults.result, 'fail'))).toHaveLength(1);
   });
@@ -154,7 +162,7 @@ describe('guests', () => {
       const slots = await service.slots(email, 'warthog', 'master-chief');
       const request = {vehicleSlug: 'warthog', instructorSlug: 'master-chief', startsAt: slots.at(-1)!.startsAt};
 
-      return service.book(email, request, DEMO_BOOKING_LIMIT);
+      return service.book(email, request, DEMO_LESSONS.length + DEMO_BOOKING_LIMIT);
     };
 
     for (let count = 0; count < DEMO_BOOKING_LIMIT; count++) {
@@ -163,6 +171,29 @@ describe('guests', () => {
     }
 
     await expect(book()).rejects.toMatchObject({code: 'demo-limit'});
+  });
+
+  it('unlock the Scorpion and the Hornet by completing one lesson', async () => {
+    await demo.claim('a', NOW);
+    const email = await guestEmail('a');
+    const catalog = new PostgresCatalogRepository(db);
+    const bookingService = new BookingService(new PostgresBookingRepository(db), catalog, () => NOW);
+    const lessonService = new LessonService(new PostgresLessonRepository(db), catalog, () => NOW);
+    const book = async (vehicleSlug: string) => {
+      const [slot] = await bookingService.slots(email, vehicleSlug, 'master-chief');
+
+      return bookingService.book(email, {vehicleSlug, instructorSlug: 'master-chief', startsAt: slot!.startsAt});
+    };
+
+    await expect(book('scorpion')).rejects.toMatchObject({code: 'course-locked'});
+    const {id} = await book('warthog');
+    const {lesson} = await lessonService.form(id, email);
+    expect(lesson.number).toBe(4);
+
+    const results = Object.fromEntries(lesson.skills.map((skill) => [skill.id, 'pass' as const]));
+    await lessonService.signOff(id, {results, attendance: 'attended', early: true}, email, email);
+    expect(await book('scorpion')).toMatchObject({status: 'booked'});
+    expect(await book('hornet')).toMatchObject({status: 'booked'});
   });
 
   it('cannot be found by email, so no signed-in account can become one', async () => {

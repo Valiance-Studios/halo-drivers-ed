@@ -1,7 +1,7 @@
 import {defineStore} from 'pinia';
 
 export interface ViewAsState {
-  /** The instructor whose schedule an admin is looking at, or null for everyone's. */
+  /** The instructor whose schedule is being looked at, or null for everyone's. */
   instructorSlug: string | null;
 }
 
@@ -10,7 +10,7 @@ export interface ViewAsOption {
   name: string;
 }
 
-/** Which instructor an admin is viewing as. A filter the API applies, not a different sign-in. */
+/** Which instructor an admin or demo guest is viewing as. A filter the API applies, not a different sign-in. */
 export const useViewAsStore = defineStore('viewAs', {
   state: (): ViewAsState => ({
     instructorSlug: null,

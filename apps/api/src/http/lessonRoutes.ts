@@ -1,4 +1,4 @@
-import type {LessonSignOff, SkillMark, SkillResults} from '@hde/shared';
+import type {LessonSignOff, Me, SkillMark, SkillResults} from '@hde/shared';
 import type {SignedInEnv} from '#src/http/signedIn.ts';
 import type {LessonService} from '#src/lessons/lessonService.ts';
 
@@ -6,7 +6,7 @@ import {Hono} from 'hono';
 import {ATTENDANCES, SKILL_RESULTS} from '@hde/shared';
 import {ApiError} from '#src/http/errors.ts';
 import {lessonId} from '#src/http/lessonId.ts';
-import {requireAdmin} from '#src/http/signedIn.ts';
+import {requireAdmin, requireGuest} from '#src/http/signedIn.ts';
 
 function isSkillResults(value: unknown): value is SkillResults {
   return (
@@ -47,22 +47,43 @@ export function lessonRoutes(service: LessonService): Hono<SignedInEnv> {
   );
 }
 
-/** Every student's lessons, for admins: all of them, or one instructor's (`?instructor=`). */
+/** Every student's lessons, for admins. */
 export function adminLessonRoutes(service: LessonService): Hono<SignedInEnv> {
+  return new Hono<SignedInEnv>().use(requireAdmin).route(
+    '/',
+    signOffRoutes(service, () => null),
+  );
+}
+
+/** A demo guest's own lessons, as an instructor sees them. */
+export function guestLessonRoutes(service: LessonService): Hono<SignedInEnv> {
+  return new Hono<SignedInEnv>().use(requireGuest).route(
+    '/',
+    signOffRoutes(service, ({email}) => email),
+  );
+}
+
+/**
+ * Lessons to mark and sign off: all of them, or one instructor's (`?instructor=`). `studentFor` names the only
+ * student whose lessons the account may use, or null if it may use everyone's.
+ */
+function signOffRoutes(service: LessonService, studentFor: (me: Me) => string | null): Hono<SignedInEnv> {
   return new Hono<SignedInEnv>()
-    .use(requireAdmin)
-    .get('/lessons', async (c) => c.json(await service.list(c.req.query('instructor') ?? null)))
-    .get('/lessons/:id', async (c) => c.json(await service.find(lessonId(c.req.param('id')))))
-    .get('/lessons/:id/form', async (c) => c.json(await service.form(lessonId(c.req.param('id')))))
+    .get('/lessons', async (c) => c.json(await service.list(c.req.query('instructor') ?? null, studentFor(c.var.me))))
+    .get('/lessons/:id', async (c) => c.json(await service.find(lessonId(c.req.param('id')), studentFor(c.var.me))))
+    .get('/lessons/:id/form', async (c) =>
+      c.json(await service.form(lessonId(c.req.param('id')), studentFor(c.var.me))),
+    )
     .put('/lessons/:id/results/:skillId', async (c) => {
       const mark = parseSkillMark(await c.req.json().catch(() => null));
-      await service.mark(lessonId(c.req.param('id')), c.req.param('skillId'), mark);
+      await service.mark(lessonId(c.req.param('id')), c.req.param('skillId'), mark, studentFor(c.var.me));
 
       return c.json(mark);
     })
     .put('/lessons/:id/sign-off', async (c) => {
       const signOff = parseSignOff(await c.req.json().catch(() => null));
+      const {me} = c.var;
 
-      return c.json(await service.signOff(lessonId(c.req.param('id')), signOff, c.var.me.email));
+      return c.json(await service.signOff(lessonId(c.req.param('id')), signOff, me.email, studentFor(me)));
     });
 }

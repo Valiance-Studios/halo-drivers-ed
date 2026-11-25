@@ -4,7 +4,8 @@ import {useAuthStore} from '@/stores/auth';
 declare module 'vue-router' {
   interface RouteMeta {
     public?: boolean;
-    admin?: boolean;
+    /** Only for accounts that sign lessons off. */
+    signOff?: boolean;
   }
 }
 
@@ -15,13 +16,13 @@ const router = createRouter({
     {path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: {public: true}},
     {path: '/courses', name: 'courses', component: () => import('@/views/CoursesView.vue')},
     {path: '/lessons', name: 'lessons', component: () => import('@/views/LessonsView.vue')},
-    {path: '/schedule', name: 'schedule', component: () => import('@/views/ScheduleView.vue'), meta: {admin: true}},
+    {path: '/schedule', name: 'schedule', component: () => import('@/views/ScheduleView.vue'), meta: {signOff: true}},
     {
       path: '/schedule/:id',
       name: 'lesson-form',
       component: () => import('@/views/LessonFormView.vue'),
       props: true,
-      meta: {admin: true},
+      meta: {signOff: true},
     },
     {path: '/:pathMatch(.*)*', redirect: {name: 'courses'}},
   ],
@@ -35,7 +36,7 @@ router.beforeEach(async (to) => {
     return {name: 'login', query: {redirect: to.fullPath}};
   }
 
-  if (to.meta.admin && !authStore.isAdmin) {
+  if (to.meta.signOff && !authStore.signOffScope) {
     return {name: 'courses'};
   }
 

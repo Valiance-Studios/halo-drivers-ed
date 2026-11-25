@@ -1,5 +1,5 @@
 import type {User} from 'firebase/auth';
-import type {Me} from '@hde/shared';
+import type {Me, SignOffScope} from '@hde/shared';
 
 import {defineStore} from 'pinia';
 import {
@@ -76,7 +76,17 @@ export const useAuthStore = defineStore('auth', {
     errorMessage: null,
   }),
   getters: {
-    isAdmin: (state): boolean => state.user?.role === 'admin',
+    /** Whose lessons the account signs off; null if it signs none off. */
+    signOffScope: (state): SignOffScope | null => {
+      switch (state.user?.role) {
+        case 'admin':
+          return 'admin';
+        case 'guest':
+          return 'demo';
+        default:
+          return null;
+      }
+    },
   },
   actions: {
     /** Resolves once the initial auth state is known; safe to call repeatedly. */

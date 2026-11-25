@@ -16,7 +16,10 @@ import {allMarked, allPassed} from '@hde/shared';
 import {ApiError} from '#src/http/errors.ts';
 import {lessonNotFound} from '#src/http/lessonId.ts';
 
-/** The rules for instructors' lesson forms and signing lessons off. */
+/**
+ * The rules for instructors' lesson forms and signing lessons off. Where a method takes `student`, only that
+ * student's lessons exist for it; null means everyone's.
+ */
 export class LessonService {
   private readonly lessons: LessonRepository;
   private readonly catalog: CatalogRepository;
@@ -28,25 +31,25 @@ export class LessonService {
     this.now = now;
   }
 
-  list(instructorSlug: string | null): Promise<AdminLesson[]> {
-    return this.lessons.list(instructorSlug);
+  list(instructorSlug: string | null, student: string | null): Promise<AdminLesson[]> {
+    return this.lessons.list(instructorSlug, student);
   }
 
-  async find(id: string): Promise<AdminLesson> {
-    return (await this.context(id)).lesson;
+  async find(id: string, student: string | null): Promise<AdminLesson> {
+    return (await this.context(id, student)).lesson;
   }
 
-  async form(id: string): Promise<LessonForm> {
-    const [context, curriculum] = await Promise.all([this.context(id), this.catalog.listCurriculum()]);
+  async form(id: string, student: string | null): Promise<LessonForm> {
+    const [context, curriculum] = await Promise.all([this.context(id, student), this.catalog.listCurriculum()]);
 
     return lessonForm(context, curriculum);
   }
 
   /** A student's own form, once the lesson is signed off as attended. */
   async studentForm(email: string, id: string): Promise<LessonForm> {
-    const [context, curriculum] = await Promise.all([this.context(id), this.catalog.listCurriculum()]);
+    const [context, curriculum] = await Promise.all([this.context(id, email), this.catalog.listCurriculum()]);
 
-    if (context.lesson.studentEmail !== email || context.lesson.lessonNumber === null) {
+    if (context.lesson.lessonNumber === null) {
       throw lessonNotFound();
     }
 
@@ -54,9 +57,11 @@ export class LessonService {
   }
 
   /** Saves one skill's mark, so marks made at the same time do not overwrite each other. */
-  async mark(id: string, skillId: string, {result, early}: SkillMark): Promise<void> {
+  async mark(id: string, skillId: string, {result, early}: SkillMark, student: string | null): Promise<void> {
     const curriculum = await this.catalog.listCurriculum();
     const lesson = await this.lessons.update(id, (context) => {
+      checkStudent(context, student);
+
       if (!early && this.now() < new Date(context.lesson.startsAt)) {
         throw new ApiError(409, 'too-early', 'Skills can be marked once the lesson starts.');
       }
@@ -82,9 +87,11 @@ export class LessonService {
     }
   }
 
-  async signOff(id: string, signOff: LessonSignOff, by: string): Promise<AdminLesson> {
+  async signOff(id: string, signOff: LessonSignOff, by: string, student: string | null): Promise<AdminLesson> {
     const [vehicles, curriculum] = await Promise.all([this.catalog.listVehicles(), this.catalog.listCurriculum()]);
     const lesson = await this.lessons.update(id, (context) => {
+      checkStudent(context, student);
+
       if (!signOff.early && this.now() < new Date(context.lesson.endsAt)) {
         throw new ApiError(409, 'too-early', 'A lesson can be signed off once it ends.');
       }
@@ -102,14 +109,23 @@ export class LessonService {
     return lesson;
   }
 
-  private async context(id: string): Promise<LessonContext> {
+  private async context(id: string, student: string | null): Promise<LessonContext> {
     const context = await this.lessons.findContext(id);
 
     if (!context) {
       throw lessonNotFound();
     }
 
+    checkStudent(context, student);
+
     return context;
+  }
+}
+
+/** Another student's lesson looks just like one that does not exist. */
+function checkStudent({lesson}: LessonContext, student: string | null): void {
+  if (student !== null && lesson.studentEmail !== student) {
+    throw lessonNotFound();
   }
 }
 

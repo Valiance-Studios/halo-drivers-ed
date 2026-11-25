@@ -14,7 +14,7 @@ import {createMiddleware} from 'hono/factory';
 import {APP_CHECK_HEADER} from '@hde/shared';
 import {bookingRoutes} from '#src/http/bookingRoutes.ts';
 import {clearExpiredDemos, demoRoutes} from '#src/http/demoRoutes.ts';
-import {adminLessonRoutes, lessonRoutes} from '#src/http/lessonRoutes.ts';
+import {adminLessonRoutes, guestLessonRoutes, lessonRoutes} from '#src/http/lessonRoutes.ts';
 import {ApiError} from '#src/http/errors.ts';
 import {DEFAULT_RATE_LIMITS, rateLimit} from '#src/http/rateLimits.ts';
 
@@ -128,7 +128,8 @@ export function createApp({
     .get('/curriculum', async (c) => c.json(await catalog.listCurriculum()))
     .route('/', bookingRoutes(bookings))
     .route('/', lessonRoutes(lessons))
-    .route('/admin', adminLessonRoutes(lessons));
+    .route('/admin', adminLessonRoutes(lessons))
+    .route('/demo', guestLessonRoutes(lessons));
 
   const app = new Hono();
 

@@ -45,7 +45,7 @@ export class BookingService {
     return slots.map(({startsAt, endsAt}) => ({startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString()}));
   }
 
-  /** `limit` caps how many lessons the student can ever book, counting cancelled ones but not signed-off ones. */
+  /** `limit` caps how many lessons the student can ever have, whatever became of them. */
   async book(email: string, request: BookingRequest, limit: number | null = null): Promise<Booking> {
     const course = await this.findCourse(request.vehicleSlug, request.instructorSlug);
     const startsAt = new Date(request.startsAt).getTime();
@@ -65,10 +65,12 @@ export class BookingService {
         ...slot,
       },
       (existing) => {
-        const booked = existing.filter(({status}) => status === 'booked' || status === 'cancelled').length;
-
-        if (limit !== null && booked >= limit) {
-          throw new ApiError(409, 'demo-limit', `You can book ${limit} lessons in the demo, counting cancelled ones.`);
+        if (limit !== null && existing.length >= limit) {
+          throw new ApiError(
+            409,
+            'demo-limit',
+            'You have booked every lesson the demo allows, counting cancelled ones.',
+          );
         }
 
         if (missingPrerequisites(vehicle, completedCourses(vehicles, existing)).length > 0) {

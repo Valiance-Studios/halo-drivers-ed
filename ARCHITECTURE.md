@@ -93,7 +93,7 @@ flowchart TB
         service["src/bookings/<br/>BookingService, findSlots"]
         demoRoutes["src/http/demoRoutes.ts"]
         demo["src/demo/<br/>demoHistory"]
-        lessonRoutes["src/http/lessonRoutes.ts<br/>+ requireAdmin"]
+        lessonRoutes["src/http/lessonRoutes.ts<br/>+ requireAdmin, requireGuest"]
         lessonService["src/lessons/<br/>LessonService"]
         repos["src/repositories/<br/>catalog, allowlist, bookings,<br/>demo, lessons"]
         db["src/db/<br/>schema, client, migrations, seed"]
@@ -150,7 +150,7 @@ sequenceDiagram
         A->>P: SELECT role FROM allowed_users WHERE email = ?
         Note right of A: no row, or no verified email<br/>(not queried): 403 not-allowed
     end
-    Note right of A: /api/admin/** and not an admin: 403 not-admin
+    Note right of A: /api/admin/** and not an admin: 403 not-admin<br/>/api/demo/** and not a guest: 403 not-allowed
     A->>P: the route's queries
     A-->>B: 200 JSON
 ```
@@ -242,8 +242,8 @@ sequenceDiagram
 ```
 
 - **Identity.** A guest is an `allowed_users` row with the role `guest` and a made-up `@demo.invalid` address, so bookings, locks and cascades work as for anyone else. A check constraint ties the role to that domain, where no real address can exist, and the allowlist lookup never returns guests. They are found by the anonymous `uid` in their slot, only until it expires (`demo-ended` after that).
-- **Limits.** Guests are students, and can book `DEMO_BOOKING_LIMIT` lessons, counting cancelled ones. The check runs under the same lock as the other booking rules.
-- **Past lessons.** Guests start with the Mongoose course completed, which unlocks the Warthog, and a Warthog lesson to repeat (`demoHistory.ts`). Each slot's are in a week of its own, in free times, so guests never clash.
+- **Limits.** Guests are students, and can book `DEMO_BOOKING_LIMIT` lessons, counting cancelled and signed-off ones. The check runs under the same lock as the other booking rules.
+- **Past lessons.** Guests start with the Mongoose course and three of the Warthog's four lessons completed, one of them on its second try (`demoHistory.ts`). Completing the last one unlocks the Scorpion and the Hornet. Each slot's are in a week of its own, in free times, so guests never clash.
 - **Expired guests** lose access at once. Their data is deleted by the next claim, or the next request their lessons could affect: `GET /api/slots`, `POST /api/bookings` and `GET /api/admin/lessons` (`clearExpiredDemos`). Signing out deletes it immediately.
 - **Anonymous accounts** are deleted by the browser on sign-out, or when the demo is full or over, unless Firebase refuses. A visitor who closes the tab leaves theirs in Firebase; deleting those would need Identity Platform or an API that may delete Firebase users.
 - **In the schedule**, guests' lessons are hidden unless an admin checks "Show demo guests".
@@ -251,7 +251,9 @@ sequenceDiagram
 
 ## Lesson Sign-Off
 
-Each booked lesson has a form: the skills of the first lesson in its course the student has not completed. From when the lesson starts, each mark is saved on its own (`PUT /api/admin/lessons/:id/results/:skillId`), so marks made together do not overwrite each other; `MarkSaver` in the web app sends one skill's marks in order. The lesson is signed off once it ends (`PUT .../sign-off`). Both refuse to be early unless the request says `early: true`, an override that, like the rest of `/api/admin`, only admins have. The instructors are seeded characters, so admins do this, optionally viewing as one (`?instructor=` on `GET /api/admin/lessons`, a filter rather than another sign-in).
+Each booked lesson has a form: the skills of the first lesson in its course the student has not completed. From when the lesson starts, each mark is saved on its own (`PUT /api/:scope/lessons/:id/results/:skillId`), so marks made together do not overwrite each other; `MarkSaver` in the web app sends one skill's marks in order. The lesson is signed off once it ends (`PUT .../sign-off`). Both refuse to be early unless the request says `early: true`, an override only the accounts that sign lessons off have. The instructors are seeded characters, so others do this, optionally viewing as one (`?instructor=` on `GET /api/:scope/lessons`, a filter rather than another sign-in).
+
+The scope is `admin` for admins (`requireAdmin`), who sign off everyone's lessons, or `demo` for [demo](#demo) guests (`requireGuest`), who sign off only their own. Both use `signOffRoutes`. For guests, `LessonService` takes their address as `student` and answers any other lesson as if it did not exist, checking changes inside the transaction that makes them.
 
 ```mermaid
 stateDiagram-v2
@@ -419,10 +421,6 @@ One image holds both entry points. Migrations and the catalog seed run as their 
 
 Agreed, not built yet. Build these on their own branches, in this order.
 
-### Guest Sign-Off
-
-Guests mark and sign off their own lessons, early if they like, so a recruiter sees the instructor's side and watches a course unlock. They stay out of `/api/admin`: the API checks that each lesson is the guest's own.
-
 ### Lesson Notes and Student History
 
 - Instructors write a note on the form that the student can read with their results, since a student who must repeat a lesson is not told why. Perhaps also a private one for the next instructor.
@@ -474,7 +472,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - Courses page: vehicles on a route map of their prerequisites, and instructors, by faction.
 - Locks on courses whose prerequisites are not complete, enforced by the API.
 - Booking: instructor hours, lesson times, booking and cancelling, My lessons, and exclusion constraints against double-booking.
-- Lesson plans (53 lessons), instructors' lesson forms, sign-off that unlocks courses, and admins' schedule with View As.
+- Lesson plans (53 lessons), instructors' lesson forms, sign-off that unlocks courses, and admins' schedule with View As. Demo guests have the same for their own lessons. Deployed and tried on the site on 2026-11-24.
 - A `student` role, which can book but not sign off.
 - [Demo](#demo) slots for recruiters: 10 at once, 2 hours each. Deployed and tried on the site on 2026-11-24, including that signing out removes the anonymous account.
 - UNSC and Covenant themes, each light and dark, with placeholder artwork.
@@ -496,9 +494,8 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### Next: Features
 
-1. [Guest sign-off](#guest-sign-off).
-2. [Lesson notes and student history](#lesson-notes-and-student-history).
-3. [Instructor cancellation and time off](#instructor-cancellation-and-time-off).
-4. [Rescheduling](#rescheduling).
-5. [Certificates](#certificates).
-6. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. Flat shapes drawn in code cannot get close. See [Artwork](docs/UI.md#artwork).
+1. [Lesson notes and student history](#lesson-notes-and-student-history).
+2. [Instructor cancellation and time off](#instructor-cancellation-and-time-off).
+3. [Rescheduling](#rescheduling).
+4. [Certificates](#certificates).
+5. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. Flat shapes drawn in code cannot get close. See [Artwork](docs/UI.md#artwork).

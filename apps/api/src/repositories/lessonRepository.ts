@@ -29,8 +29,8 @@ export interface LessonChange {
 }
 
 export interface LessonRepository {
-  /** Lessons that were not cancelled, soonest first: one instructor's, or everyone's. */
-  list(instructorSlug: string | null): Promise<AdminLesson[]>;
+  /** Lessons that were not cancelled, soonest first; null means every instructor's, or every student's. */
+  list(instructorSlug: string | null, studentEmail: string | null): Promise<AdminLesson[]>;
   findContext(id: string): Promise<LessonContext | null>;
   /**
    * Makes the change `decide` returns, unless it throws. The student's lessons cannot change meanwhile. Null if
@@ -52,12 +52,17 @@ export class PostgresLessonRepository implements LessonRepository {
     this.db = db;
   }
 
-  async list(instructorSlug: string | null): Promise<AdminLesson[]> {
+  async list(instructorSlug: string | null, studentEmail: string | null): Promise<AdminLesson[]> {
     const rows = await this.db
       .select({booking: bookings, studentName: allowedUsers.displayName})
       .from(bookings)
       .innerJoin(allowedUsers, eq(allowedUsers.email, bookings.studentEmail))
-      .where(instructorSlug ? eq(bookings.instructorSlug, instructorSlug) : undefined)
+      .where(
+        and(
+          instructorSlug ? eq(bookings.instructorSlug, instructorSlug) : undefined,
+          studentEmail ? eq(bookings.studentEmail, studentEmail) : undefined,
+        ),
+      )
       .orderBy(asc(bookings.startsAt));
 
     return rows

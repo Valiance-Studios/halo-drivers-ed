@@ -18,7 +18,7 @@ import {mapStores} from 'pinia';
 import {useCatalogStore} from '@/stores/catalog';
 import {useViewAsStore} from '@/stores/viewAs';
 
-/** For admins: whose schedule to look at. */
+/** For signing off: whose schedule to look at. */
 export default defineComponent({
   name: 'ViewAsSelect',
   computed: {

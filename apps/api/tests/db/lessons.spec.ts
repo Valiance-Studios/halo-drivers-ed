@@ -43,7 +43,7 @@ function marks(number: number, result: SkillResult, except: SkillResults = {}, v
 }
 
 const signOff = (id: string, results: SkillResults) =>
-  service.signOff(id, {results, attendance: 'attended', early: false}, ADMIN);
+  service.signOff(id, {results, attendance: 'attended', early: false}, ADMIN, null);
 
 async function errorCode(call: Promise<unknown>): Promise<string | undefined> {
   return call.then(
@@ -79,10 +79,10 @@ afterAll(async () => {
 describe('lesson forms', () => {
   it('completes a lesson when every skill is passed, then opens the next one', async () => {
     const [first, second] = [await book(at(8)), await book(at(9))];
-    expect((await service.form(first)).lesson).toMatchObject({number: 1, title: 'Startup and controls'});
+    expect((await service.form(first, null)).lesson).toMatchObject({number: 1, title: 'Startup and controls'});
 
     expect(await signOff(first, marks(1, 'pass'))).toMatchObject({status: 'completed', lessonNumber: 1});
-    expect((await service.form(second)).lesson.number).toBe(2);
+    expect((await service.form(second, null)).lesson.number).toBe(2);
     expect(await signOff(second, marks(2, 'pass'))).toMatchObject({status: 'completed', lessonNumber: 2});
   });
 
@@ -90,11 +90,11 @@ describe('lesson forms', () => {
     const [first, second] = [await book(at(8)), await book(at(9))];
     expect(await signOff(first, marks(1, 'pass', {parkingBrake: 'fail'}))).toMatchObject({status: 'repeat'});
 
-    const form = await service.form(second);
+    const form = await service.form(second, null);
     expect(form.lesson.number).toBe(1);
     expect(form.passedBefore).toEqual(['walkaround', 'startEngine', 'readGauges', 'throttleAndStop']);
     expect(await signOff(second, {parkingBrake: 'pass', walkaround: 'fail'})).toMatchObject({status: 'completed'});
-    expect((await service.form(second)).results).toEqual(marks(1, 'pass'));
+    expect((await service.form(second, null)).results).toEqual(marks(1, 'pass'));
   });
 
   it('saves marks from when a lesson starts, but signs off only once it ends', async () => {
@@ -102,26 +102,33 @@ describe('lesson forms', () => {
     const during = new LessonService(new PostgresLessonRepository(db), catalog, () => at(10, 12.5));
     const before = new LessonService(new PostgresLessonRepository(db), catalog, () => at(10, 11));
 
-    expect(await errorCode(before.mark(id, 'startEngine', {result: 'pass', early: false}))).toBe('too-early');
-    await during.mark(id, 'startEngine', {result: 'fail', early: false});
-    await during.mark(id, 'startEngine', {result: 'pass', early: false});
-    expect((await service.form(id)).results).toEqual({startEngine: 'pass'});
-    await during.mark(id, 'startEngine', {result: null, early: false});
-    expect((await service.form(id)).results).toEqual({});
-    expect(await errorCode(during.mark(id, 'winch', {result: null, early: false}))).toBe('invalid-request');
+    expect(await errorCode(before.mark(id, 'startEngine', {result: 'pass', early: false}, null))).toBe('too-early');
+    await during.mark(id, 'startEngine', {result: 'fail', early: false}, null);
+    await during.mark(id, 'startEngine', {result: 'pass', early: false}, null);
+    expect((await service.form(id, null)).results).toEqual({startEngine: 'pass'});
+    await during.mark(id, 'startEngine', {result: null, early: false}, null);
+    expect((await service.form(id, null)).results).toEqual({});
+    expect(await errorCode(during.mark(id, 'winch', {result: null, early: false}, null))).toBe('invalid-request');
     expect(
-      await errorCode(during.signOff(id, {results: marks(1, 'pass'), attendance: 'attended', early: false}, ADMIN)),
+      await errorCode(
+        during.signOff(id, {results: marks(1, 'pass'), attendance: 'attended', early: false}, ADMIN, null),
+      ),
     ).toBe('too-early');
   });
 
   it('can be marked and signed off early, when asked to', async () => {
     const id = await book(at(20));
-    expect(await errorCode(service.mark(id, 'startEngine', {result: 'pass', early: false}))).toBe('too-early');
-    await service.mark(id, 'startEngine', {result: 'pass', early: true});
-    expect((await service.form(id)).results).toEqual({startEngine: 'pass'});
+    expect(await errorCode(service.mark(id, 'startEngine', {result: 'pass', early: false}, null))).toBe('too-early');
+    await service.mark(id, 'startEngine', {result: 'pass', early: true}, null);
+    expect((await service.form(id, null)).results).toEqual({startEngine: 'pass'});
 
     expect(await errorCode(signOff(id, marks(1, 'pass')))).toBe('too-early');
-    const signedOff = service.signOff(id, {results: marks(1, 'pass'), attendance: 'attended', early: true}, ADMIN);
+    const signedOff = service.signOff(
+      id,
+      {results: marks(1, 'pass'), attendance: 'attended', early: true},
+      ADMIN,
+      null,
+    );
     expect(await signedOff).toMatchObject({status: 'completed'});
   });
 
@@ -129,21 +136,21 @@ describe('lesson forms', () => {
     const id = await book(at(8));
     const expected = marks(1, 'pass');
     await Promise.all(
-      Object.keys(expected).map((skillId) => service.mark(id, skillId, {result: 'pass', early: false})),
+      Object.keys(expected).map((skillId) => service.mark(id, skillId, {result: 'pass', early: false}, null)),
     );
 
-    expect((await service.form(id)).results).toEqual(expected);
+    expect((await service.form(id, null)).results).toEqual(expected);
   });
 
   it('shows the name the student signed in with', async () => {
     const id = await book(at(8), 'mongoose', OTHER);
-    expect(await service.find(id)).toMatchObject({studentEmail: OTHER, studentName: null});
+    expect(await service.find(id, null)).toMatchObject({studentEmail: OTHER, studentName: null});
 
     const allowlist = new PostgresAllowlistRepository(db);
     await allowlist.rememberName(OTHER, 'Sam Other');
     await allowlist.allow(OTHER, 'student');
-    expect(await service.find(id)).toMatchObject({studentName: 'Sam Other'});
-    expect(await service.list(null)).toMatchObject([{studentName: 'Sam Other'}]);
+    expect(await service.find(id, null)).toMatchObject({studentName: 'Sam Other'});
+    expect(await service.list(null, null)).toMatchObject([{studentName: 'Sam Other'}]);
   });
 
   it('needs every skill marked, and only skills in the lesson', async () => {
@@ -159,10 +166,11 @@ describe('lesson forms', () => {
       id,
       {results: {startEngine: 'pass'}, attendance: 'missed', early: false},
       ADMIN,
+      null,
     );
 
     expect(missed).toMatchObject({status: 'missed', lessonNumber: null});
-    expect((await service.form(id)).results).toEqual({});
+    expect((await service.form(id, null)).results).toEqual({});
   });
 
   it('signs a course off in order', async () => {
@@ -179,7 +187,9 @@ describe('lesson forms', () => {
     await signOff(id, marks(1, 'fail'));
 
     expect(await signOff(id, marks(1, 'pass'))).toMatchObject({status: 'completed'});
-    expect(await errorCode(service.mark(id, 'startEngine', {result: 'fail', early: false}))).toBe('sign-off-conflict');
+    expect(await errorCode(service.mark(id, 'startEngine', {result: 'fail', early: false}, null))).toBe(
+      'sign-off-conflict',
+    );
   });
 
   it('refuses a correction that would lock a course the student has lessons in', async () => {
@@ -209,14 +219,32 @@ describe('lesson forms', () => {
     expect(await errorCode(service.studentForm(OTHER, id))).toBe('not-found');
   });
 
+  it("treats other students' lessons as missing, when held to one student", async () => {
+    const own = await book(at(8));
+    const other = await book(at(9), 'mongoose', OTHER);
+    const signOffAs = (id: string, student: string) =>
+      service.signOff(id, {results: marks(1, 'pass'), attendance: 'attended', early: false}, student, student);
+
+    expect(await service.list(null, STUDENT)).toMatchObject([{id: own}]);
+    expect(await service.list('arbiter', STUDENT)).toEqual([]);
+    expect(await errorCode(service.find(other, STUDENT))).toBe('not-found');
+    expect(await errorCode(service.form(other, STUDENT))).toBe('not-found');
+    expect(await errorCode(service.mark(other, 'startEngine', {result: 'pass', early: false}, STUDENT))).toBe(
+      'not-found',
+    );
+    expect(await errorCode(signOffAs(other, STUDENT))).toBe('not-found');
+    expect(await service.form(other, null)).toMatchObject({results: {}});
+    expect(await signOffAs(own, STUDENT)).toMatchObject({status: 'completed'});
+  });
+
   it("lists everyone's lessons or one instructor's, without cancelled ones", async () => {
     await book(at(8));
     const cancelled = await book(at(9));
     await db.update(bookings).set({status: 'cancelled'}).where(eq(bookings.id, cancelled));
 
-    expect(await service.list(null)).toHaveLength(1);
-    expect(await service.list('master-chief')).toMatchObject([{studentEmail: STUDENT}]);
-    expect(await service.list('arbiter')).toEqual([]);
+    expect(await service.list(null, null)).toHaveLength(1);
+    expect(await service.list('master-chief', null)).toMatchObject([{studentEmail: STUDENT}]);
+    expect(await service.list('arbiter', null)).toEqual([]);
   });
 });
 
@@ -260,7 +288,7 @@ describe('curriculum', () => {
 
     try {
       await seedCatalog(db, {vehicles: VEHICLES, instructors: INSTRUCTORS, availability: AVAILABILITY, curriculum});
-      expect((await service.form(id)).lesson.skills.map((skill) => skill.id)).not.toContain('parkingBrake');
+      expect((await service.form(id, null)).lesson.skills.map((skill) => skill.id)).not.toContain('parkingBrake');
       expect(await db.select().from(skillResults).where(eq(skillResults.skillId, 'parkingBrake'))).toHaveLength(1);
     } finally {
       await seedCatalog(db);

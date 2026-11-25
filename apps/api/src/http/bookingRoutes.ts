@@ -4,8 +4,12 @@ import type {SignedInEnv} from '#src/http/signedIn.ts';
 
 import {Hono} from 'hono';
 import {DEMO_BOOKING_LIMIT} from '@hde/shared';
+import {DEMO_LESSONS} from '#src/demo/demoHistory.ts';
 import {ApiError} from '#src/http/errors.ts';
 import {lessonId} from '#src/http/lessonId.ts';
+
+/** A guest's lessons include the ones they start with. */
+const GUEST_LESSON_LIMIT = DEMO_LESSONS.length + DEMO_BOOKING_LIMIT;
 
 /** Checks a request's JSON body, which could hold anything. */
 function parseBookingRequest(body: unknown): BookingRequest {
@@ -37,7 +41,7 @@ export function bookingRoutes(service: BookingService): Hono<SignedInEnv> {
 
       const {email, role} = c.var.me;
 
-      return c.json(await service.book(email, request, role === 'guest' ? DEMO_BOOKING_LIMIT : null), 201);
+      return c.json(await service.book(email, request, role === 'guest' ? GUEST_LESSON_LIMIT : null), 201);
     })
     .post('/bookings/:id/cancel', async (c) => {
       return c.json(await service.cancel(c.var.me.email, lessonId(c.req.param('id'))));

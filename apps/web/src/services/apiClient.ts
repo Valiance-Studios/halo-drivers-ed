@@ -11,6 +11,7 @@ import type {
   LessonSignOff,
   LessonSlot,
   Me,
+  SignOffScope,
   SkillMark,
   Vehicle,
 } from '@hde/shared';
@@ -99,26 +100,28 @@ export class ApiClient {
     return this.get(`/bookings/${encodeURIComponent(id)}/form`);
   }
 
-  /** For admins: one instructor's lessons, or everyone's. */
-  listLessons(instructorSlug: string | null): Promise<AdminLesson[]> {
-    return this.get(`/admin/lessons${instructorSlug ? `?${new URLSearchParams({instructor: instructorSlug})}` : ''}`);
+  /** For signing off: one instructor's lessons, or every instructor's. */
+  listLessons(scope: SignOffScope, instructorSlug: string | null): Promise<AdminLesson[]> {
+    return this.get(
+      `/${scope}/lessons${instructorSlug ? `?${new URLSearchParams({instructor: instructorSlug})}` : ''}`,
+    );
   }
 
-  getLesson(id: string): Promise<AdminLesson> {
-    return this.get(`/admin/lessons/${encodeURIComponent(id)}`);
+  getLesson(scope: SignOffScope, id: string): Promise<AdminLesson> {
+    return this.get(`/${scope}/lessons/${encodeURIComponent(id)}`);
   }
 
-  getLessonForm(id: string): Promise<LessonForm> {
-    return this.get(`/admin/lessons/${encodeURIComponent(id)}/form`);
+  getLessonForm(scope: SignOffScope, id: string): Promise<LessonForm> {
+    return this.get(`/${scope}/lessons/${encodeURIComponent(id)}/form`);
   }
 
   /** Saves one skill's mark; null clears it. */
-  markSkill(id: string, skillId: string, mark: SkillMark): Promise<SkillMark> {
-    return this.put(`/admin/lessons/${encodeURIComponent(id)}/results/${encodeURIComponent(skillId)}`, mark);
+  markSkill(scope: SignOffScope, id: string, skillId: string, mark: SkillMark): Promise<SkillMark> {
+    return this.put(`/${scope}/lessons/${encodeURIComponent(id)}/results/${encodeURIComponent(skillId)}`, mark);
   }
 
-  signOffLesson(id: string, signOff: LessonSignOff): Promise<AdminLesson> {
-    return this.put(`/admin/lessons/${encodeURIComponent(id)}/sign-off`, signOff);
+  signOffLesson(scope: SignOffScope, id: string, signOff: LessonSignOff): Promise<AdminLesson> {
+    return this.put(`/${scope}/lessons/${encodeURIComponent(id)}/sign-off`, signOff);
   }
 
   private get<T>(path: string): Promise<T> {

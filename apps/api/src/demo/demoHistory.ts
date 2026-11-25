@@ -3,7 +3,10 @@ import type {AvailabilityWindow} from '#src/db/availabilityData.ts';
 
 import {findSlots} from '#src/bookings/lessonSlots.ts';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+/** Between the starts of a guest's past lessons, which leaves room for two on a weekday. */
+const SPACING_MS = 3 * HOUR_MS;
 
 /** Guests' past lessons are all with this instructor, who teaches both courses. */
 export const DEMO_INSTRUCTOR = 'master-chief';
@@ -14,11 +17,17 @@ export interface DemoLesson {
   status: 'completed' | 'repeat';
 }
 
-/** The Mongoose course, which unlocks the Warthog, and a first Warthog lesson to repeat. */
+/**
+ * The Mongoose course, and all but the last of the Warthog's four lessons, one of which took two tries. Completing
+ * the last one unlocks the Scorpion and the Hornet.
+ */
 export const DEMO_LESSONS: DemoLesson[] = [
   {vehicleSlug: 'mongoose', lessonNumber: 1, status: 'completed'},
   {vehicleSlug: 'mongoose', lessonNumber: 2, status: 'completed'},
-  {vehicleSlug: 'warthog', lessonNumber: 1, status: 'repeat'},
+  {vehicleSlug: 'warthog', lessonNumber: 1, status: 'completed'},
+  {vehicleSlug: 'warthog', lessonNumber: 2, status: 'completed'},
+  {vehicleSlug: 'warthog', lessonNumber: 3, status: 'repeat'},
+  {vehicleSlug: 'warthog', lessonNumber: 3, status: 'completed'},
 ];
 
 /** When a slot's guest had their past lessons: each slot has its own week, so guests never clash. */
@@ -30,7 +39,7 @@ export function historyPeriod(slot: number, now: Date): {from: Date; until: Date
   };
 }
 
-/** A time in the instructor's hours for each lesson, in order and on different days. Fewer if there is no room. */
+/** A time in the instructor's hours for each lesson, in order. Fewer if there is no room. */
 export function findHistoryTimes(
   lessonMinutes: number[],
   period: {from: Date; until: Date},
@@ -48,7 +57,7 @@ export function findHistoryTimes(
     }
 
     times.push(time);
-    from = new Date(time.startsAt.getTime() + DAY_MS / 2);
+    from = new Date(time.startsAt.getTime() + SPACING_MS);
   }
 
   return times;
