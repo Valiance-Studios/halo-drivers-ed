@@ -56,7 +56,7 @@ Conventions are in [CLAUDE.md](../CLAUDE.md#environment-files). In short:
 
 ## Tests
 
-- **Unit**: `apps/web/tests/unit` (stores and the API client with mocks), `apps/api/tests/unit` (routes with fake token verifier and repositories, config rules, catalog data), `tests/scripts`.
+- **Unit**: `apps/web/tests/unit` (stores and the API client with mocks), `apps/api/tests/unit` (routes with fake token verifier and repositories, config rules, catalog data, request limits), `tests/scripts` (deploy checks, hosting headers).
 - **Database**: `apps/api/tests/db`. They prove the constraints hold in Postgres itself, such as rejecting an instructor who teaches another faction's vehicle.
 - **E2E**: `apps/web/e2e`. Sign-in through the emulator's account chooser, the allowlist, and the courses page against the real API and database.
 

@@ -1,17 +1,20 @@
 import type {Config} from '#src/config.ts';
 import type {TokenVerifier} from '#src/auth/tokenVerifier.ts';
 import type {BookingService} from '#src/bookings/bookingService.ts';
+import type {RateLimits} from '#src/http/rateLimits.ts';
 import type {SignedInEnv} from '#src/http/signedIn.ts';
 import type {LessonService} from '#src/lessons/lessonService.ts';
 import type {AllowlistRepository} from '#src/repositories/allowlistRepository.ts';
 import type {CatalogRepository} from '#src/repositories/catalogRepository.ts';
 
 import {Hono} from 'hono';
+import {bodyLimit} from 'hono/body-limit';
 import {createMiddleware} from 'hono/factory';
 import {APP_CHECK_HEADER} from '@hde/shared';
 import {bookingRoutes} from '#src/http/bookingRoutes.ts';
 import {adminLessonRoutes, lessonRoutes} from '#src/http/lessonRoutes.ts';
 import {ApiError} from '#src/http/errors.ts';
+import {DEFAULT_RATE_LIMITS, rateLimit} from '#src/http/rateLimits.ts';
 
 export interface AppDependencies {
   appCheck: Config['appCheck'];
@@ -20,16 +23,35 @@ export interface AppDependencies {
   catalog: CatalogRepository;
   bookings: BookingService;
   lessons: LessonService;
+  rateLimits?: RateLimits;
 }
 
 const BEARER_PREFIX = 'Bearer ';
+/** Every body is small JSON; the largest is a sign-off's results. */
+const MAX_BODY_BYTES = 16 * 1024;
 
 /**
  * The HTTP API. Every route under /api except the health check needs a valid App Check token (unless
- * turned off for the emulators), a Firebase ID token, and an account on the allowlist.
+ * turned off for the emulators), a Firebase ID token, and an account on the allowlist. Requests are limited in size
+ * and, per account, in number.
  */
-export function createApp({appCheck, verifier, allowlist, catalog, bookings, lessons}: AppDependencies): Hono {
-  const requireSignedIn = createMiddleware<SignedInEnv>(async (c, next) => {
+export function createApp({
+  appCheck,
+  verifier,
+  allowlist,
+  catalog,
+  bookings,
+  lessons,
+  rateLimits = DEFAULT_RATE_LIMITS,
+}: AppDependencies): Hono {
+  const limitBody = bodyLimit({
+    maxSize: MAX_BODY_BYTES,
+    onError: () => {
+      throw new ApiError(413, 'request-too-large', 'This request is too large.');
+    },
+  });
+
+  const requireIdentity = createMiddleware<SignedInEnv>(async (c, next) => {
     if (appCheck === 'required') {
       const appCheckToken = c.req.header(APP_CHECK_HEADER);
 
@@ -46,15 +68,17 @@ export function createApp({appCheck, verifier, allowlist, catalog, bookings, les
       throw new ApiError(401, 'unauthenticated', 'Sign in first.');
     }
 
-    let email: string | null;
-    let displayName: string | null;
-
     try {
-      ({email, displayName} = await verifier.verifyIdToken(authorization.slice(BEARER_PREFIX.length)));
+      c.set('identity', await verifier.verifyIdToken(authorization.slice(BEARER_PREFIX.length)));
     } catch {
       throw new ApiError(401, 'unauthenticated', 'Your sign-in has expired or is invalid. Sign in again.');
     }
 
+    await next();
+  });
+
+  const requireAllowed = createMiddleware<SignedInEnv>(async (c, next) => {
+    const {email} = c.var.identity;
     const role = email ? await allowlist.findRole(email) : null;
 
     if (!email || !role) {
@@ -62,17 +86,18 @@ export function createApp({appCheck, verifier, allowlist, catalog, bookings, les
     }
 
     c.set('me', {email: email.toLowerCase(), role});
-    c.set('displayName', displayName);
     await next();
   });
 
   const signedIn = new Hono<SignedInEnv>()
-    .use(requireSignedIn)
+    .use(requireIdentity)
+    .use(rateLimit(rateLimits))
+    .use(requireAllowed)
     .get('/me', async (c) => {
-      const {me, displayName} = c.var;
+      const {me, identity} = c.var;
 
-      if (displayName) {
-        await allowlist.rememberName(me.email, displayName);
+      if (identity.displayName) {
+        await allowlist.rememberName(me.email, identity.displayName);
       }
 
       return c.json(me);
@@ -86,6 +111,7 @@ export function createApp({appCheck, verifier, allowlist, catalog, bookings, les
 
   const app = new Hono();
 
+  app.use('/api/*', limitBody);
   app.get('/api/health', (c) => c.json({status: 'ok'}));
   app.route('/api', signedIn);
 

@@ -15,6 +15,19 @@
         "destination": "/index.html"
       }
     ],
+    "headers": [
+      {
+        "regex": "^/(_?[^_].*|_)?$",
+        "headers": [
+          {
+            "key": "Content-Security-Policy",
+            "value": "default-src 'self'; script-src 'self' https://apis.google.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://content-firebaseappcheck.googleapis.com https://www.google.com/recaptcha/; frame-src https://vs-halo-drivers-ed-dev.firebaseapp.com https://www.google.com/recaptcha/; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+          },
+          {"key": "X-Content-Type-Options", "value": "nosniff"},
+          {"key": "Referrer-Policy", "value": "strict-origin-when-cross-origin"}
+        ]
+      }
+    ],
     "predeploy": ["node scripts/check-firebase-config.ts staging", "npm run build:staging -w @hde/web"]
   },
   "emulators": {
