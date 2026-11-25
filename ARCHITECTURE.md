@@ -580,7 +580,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - UNSC and Covenant themes, each light and dark, with placeholder artwork.
 - Local development with Docker Postgres and the Auth emulator; unit, database and E2E tests.
 - API image, Cloud Build config and deploy script (migrate job, then service).
-- The hosting build hook runs on Windows (checked through cross-env, not yet by a deploy): it no longer names a workspace.
+- `npm run deploy:web` works on Windows: its hosting build hook no longer names a workspace. Deployed from Windows on 2026-11-25.
 - Deployed on 2026-11-19 to `vs-halo-drivers-ed-dev`: the `hde-api` Cloud Run service, the `hde-migrate` job (tables and catalog seed in Neon) and the site at https://vs-halo-drivers-ed-dev.web.app, with the owner's account allowlisted. The whole [one-time setup](docs/DEPLOYMENT.md#one-time-setup) is done.
 - App Check: reCAPTCHA Enterprise registered for the web app, enforced for Authentication and required by the API; a debug token for `npm run dev:staging`, which proxies `/api` to the deployed API.
 - Credentials locked down: the Firebase web API key allows only the hosted domains and `localhost:5173`, and only the Identity Toolkit, Token Service and App Check APIs; each service account has only its listed roles.
