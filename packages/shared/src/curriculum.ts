@@ -31,14 +31,21 @@ export interface LessonForm {
 export const ATTENDANCES = ['attended', 'missed'] as const;
 export type Attendance = (typeof ATTENDANCES)[number];
 
-/** The body of `PUT /api/admin/lessons/:id/results/:skillId`. Null clears the mark. */
+/**
+ * Whose lessons an account signs off, and so the API's path for them: admins everyone's, and demo guests only
+ * their own.
+ */
+export const SIGN_OFF_SCOPES = ['admin', 'demo'] as const;
+export type SignOffScope = (typeof SIGN_OFF_SCOPES)[number];
+
+/** The body of `PUT /api/:scope/lessons/:id/results/:skillId`. Null clears the mark. */
 export interface SkillMark {
   result: SkillResult | null;
   /** Marks the skill before the lesson starts, which is otherwise refused. */
   early: boolean;
 }
 
-/** The body of `PUT /api/admin/lessons/:id/sign-off`, with the whole form as it stands. */
+/** The body of `PUT /api/:scope/lessons/:id/sign-off`, with the whole form as it stands. */
 export interface LessonSignOff {
   results: SkillResults;
   attendance: Attendance;

@@ -283,6 +283,24 @@ describe('API', () => {
       expect((await get(makeApp(), '/api/admin/lessons', GUEST)).status).toBe(403);
     });
 
+    it('gives a guest only their own lessons to sign off', async () => {
+      const list = vi.fn(async () => []);
+      const lessons = new LessonService({...lessonRepository, list}, catalog);
+      const app = makeApp({lessons});
+
+      expect((await get(app, '/api/demo/lessons?instructor=arbiter', GUEST)).status).toBe(200);
+      expect(list).toHaveBeenCalledWith('arbiter', 'guest-1@demo.invalid');
+      // pat@example.com's lesson.
+      expect((await get(app, `/api/demo/lessons/${BOOKING.id}`, GUEST)).status).toBe(404);
+      expect((await get(app, `/api/demo/lessons/${BOOKING.id}/form`, GUEST)).status).toBe(404);
+    });
+
+    it.each(['pat@example.com', 'sam@example.com'])("keeps %s out of guests' routes", async (email) => {
+      const headers = {...SIGNED_IN, Authorization: `Bearer valid-${email}`};
+
+      expect((await get(makeApp(), '/api/demo/lessons', headers)).status).toBe(403);
+    });
+
     it('turns a guest away once their session ends, but lets them start another', async () => {
       const app = makeApp({demo: {...demo, findGuest: async () => null}});
       const response = await get(app, '/api/vehicles', GUEST);

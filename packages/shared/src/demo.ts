@@ -3,8 +3,8 @@ export const DEMO_SLOTS = 10;
 
 export const DEMO_SESSION_MINUTES = 120;
 
-/** How many lessons a guest may book, counting ones they cancel. */
-export const DEMO_BOOKING_LIMIT = 6;
+/** How many lessons a guest may book, counting ones they cancel or sign off. Enough to complete a few courses. */
+export const DEMO_BOOKING_LIMIT = 12;
 
 /** Guests' made-up addresses end with this, as a database constraint makes sure. No real account's can. */
 export const GUEST_EMAIL_DOMAIN = '@demo.invalid';

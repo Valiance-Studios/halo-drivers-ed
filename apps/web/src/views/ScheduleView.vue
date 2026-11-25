@@ -4,6 +4,12 @@
       <h1 class="schedule__heading">Schedule</h1>
       <ViewAsSelect />
     </div>
+    <p
+      v-if="isDemo"
+      class="schedule__note"
+    >
+      These are your own lessons, as their instructors see them. Open one to mark it and sign it off, early if you like.
+    </p>
     <Message
       v-if="errorMessage || catalogStore.errorMessage"
       severity="error"
@@ -61,6 +67,7 @@ import {defineComponent} from 'vue';
 import {mapStores} from 'pinia';
 import {isGuestEmail} from '@hde/shared';
 import {api} from '@/services/api';
+import {useAuthStore} from '@/stores/auth';
 import {useCatalogStore} from '@/stores/catalog';
 import {useViewAsStore} from '@/stores/viewAs';
 import LessonList from '@/components/LessonList.vue';
@@ -72,7 +79,7 @@ interface LessonGroup {
   empty: string;
 }
 
-/** For admins: an instructor's lessons, or everyone's, by what they need. */
+/** For admins, an instructor's lessons or everyone's, and for demo guests their own, by what they need. */
 export default defineComponent({
   name: 'ScheduleView',
   components: {LessonList, ViewAsSelect},
@@ -80,12 +87,17 @@ export default defineComponent({
     return {lessons: [] as AdminLesson[], loading: true, errorMessage: '', now: new Date(), showGuests: false};
   },
   computed: {
-    ...mapStores(useCatalogStore, useViewAsStore),
+    ...mapStores(useAuthStore, useCatalogStore, useViewAsStore),
+    isDemo(): boolean {
+      return this.authStore.signOffScope === 'demo';
+    },
     hasGuests(): boolean {
-      return this.lessons.some(({studentEmail}) => isGuestEmail(studentEmail));
+      return !this.isDemo && this.lessons.some(({studentEmail}) => isGuestEmail(studentEmail));
     },
     shownLessons(): AdminLesson[] {
-      return this.showGuests ? this.lessons : this.lessons.filter(({studentEmail}) => !isGuestEmail(studentEmail));
+      return this.showGuests || this.isDemo
+        ? this.lessons
+        : this.lessons.filter(({studentEmail}) => !isGuestEmail(studentEmail));
     },
     groups(): LessonGroup[] {
       const booked = this.shownLessons.filter(({status}) => status === 'booked');
@@ -121,11 +133,17 @@ export default defineComponent({
     },
     async load() {
       const {instructorSlug} = this.viewAsStore;
+      const {signOffScope} = this.authStore;
+
+      if (!signOffScope) {
+        return;
+      }
+
       this.loading = true;
       this.errorMessage = '';
 
       try {
-        const lessons = await api.listLessons(instructorSlug);
+        const lessons = await api.listLessons(signOffScope, instructorSlug);
 
         // Another instructor may have been chosen meanwhile.
         if (instructorSlug === this.viewAsStore.instructorSlug) {
@@ -163,6 +181,11 @@ export default defineComponent({
   &__subheading {
     margin: 1.75rem 0 1rem;
     font-size: 1.6875rem;
+  }
+
+  &__note {
+    margin: 0.75rem 0 0;
+    color: var(--app-muted);
   }
 
   &__guests {

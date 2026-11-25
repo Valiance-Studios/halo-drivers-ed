@@ -43,7 +43,7 @@
             My lessons
           </RouterLink>
           <RouterLink
-            v-if="authStore.isAdmin"
+            v-if="authStore.signOffScope"
             class="app__link"
             :to="{name: 'schedule'}"
           >

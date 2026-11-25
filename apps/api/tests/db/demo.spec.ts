@@ -4,6 +4,7 @@ import {DEMO_BOOKING_LIMIT, DEMO_SESSION_MINUTES, DEMO_SLOTS} from '@hde/shared'
 import {BookingService} from '#src/bookings/bookingService.ts';
 import {connect} from '#src/db/client.ts';
 import {allowedUsers, bookings, demoSlots, skillResults} from '#src/db/schema.ts';
+import {DEMO_LESSONS} from '#src/demo/demoHistory.ts';
 import {seedCatalog, seedDemoSlots} from '#src/db/seed.ts';
 import {PostgresAllowlistRepository} from '#src/repositories/allowlistRepository.ts';
 import {PostgresBookingRepository} from '#src/repositories/bookingRepository.ts';
@@ -154,7 +155,7 @@ describe('guests', () => {
       const slots = await service.slots(email, 'warthog', 'master-chief');
       const request = {vehicleSlug: 'warthog', instructorSlug: 'master-chief', startsAt: slots.at(-1)!.startsAt};
 
-      return service.book(email, request, DEMO_BOOKING_LIMIT);
+      return service.book(email, request, DEMO_LESSONS.length + DEMO_BOOKING_LIMIT);
     };
 
     for (let count = 0; count < DEMO_BOOKING_LIMIT; count++) {
