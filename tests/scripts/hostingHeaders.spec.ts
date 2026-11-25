@@ -1,4 +1,5 @@
 import {readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
 import {describe, expect, it} from 'vite-plus/test';
 import {loadEnv} from 'vite-plus';
 
@@ -24,7 +25,7 @@ describe('hosting headers', () => {
   });
 
   it("allow the staging project's sign-in frame", () => {
-    const authDomain = loadEnv('staging', new URL('apps/web', root).pathname, 'VITE_').VITE_FIREBASE_AUTH_DOMAIN;
+    const authDomain = loadEnv('staging', fileURLToPath(new URL('apps/web', root)), 'VITE_').VITE_FIREBASE_AUTH_DOMAIN;
     const policy = rule?.headers.find(({key}) => key === 'Content-Security-Policy')?.value;
 
     expect(policy).toMatch(new RegExp(`frame-src [^;]*https://${authDomain}[ ;]`));
