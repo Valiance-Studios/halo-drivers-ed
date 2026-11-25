@@ -1,10 +1,12 @@
+import type {DecodedIdToken} from 'firebase-admin/auth';
+
 import {initializeApp} from 'firebase-admin/app';
 import {getAppCheck} from 'firebase-admin/app-check';
 import {getAuth} from 'firebase-admin/auth';
 
 export interface VerifiedUser {
   uid: string;
-  /** Null for accounts without one, such as the anonymous demo guests to come. */
+  /** Null for accounts without a verified one, such as the anonymous demo guests to come. */
   email: string | null;
   /** The account's name, if it has one. */
   displayName: string | null;
@@ -20,6 +22,16 @@ export interface TokenVerifier {
 
 const MAX_NAME_LENGTH = 100;
 
+/** What the app uses of a valid ID token. */
+export function toVerifiedUser({uid, email, email_verified: emailVerified, name}: DecodedIdToken): VerifiedUser {
+  // The name comes from the account's owner, so its type and length are not taken on trust.
+  const ownName: unknown = name;
+  const displayName = typeof ownName === 'string' ? ownName.trim().slice(0, MAX_NAME_LENGTH) || null : null;
+
+  // Anyone could register an allowlisted address, so one whose owner has not proved it counts as none.
+  return {uid, email: emailVerified === true ? (email ?? null) : null, displayName};
+}
+
 /**
  * Verifies tokens with the Firebase Admin SDK. Both checks use Google's public keys, so the service
  * account needs no Firebase roles. With FIREBASE_AUTH_EMULATOR_HOST set, ID tokens come from the emulator.
@@ -31,13 +43,7 @@ export function createFirebaseTokenVerifier(projectId: string): TokenVerifier {
 
   return {
     async verifyIdToken(token) {
-      const decoded = await auth.verifyIdToken(token);
-
-      // The name comes from the account's owner, so its type and length are not taken on trust.
-      const name: unknown = decoded.name;
-      const displayName = typeof name === 'string' ? name.trim().slice(0, MAX_NAME_LENGTH) || null : null;
-
-      return {uid: decoded.uid, email: decoded.email ?? null, displayName};
+      return toVerifiedUser(await auth.verifyIdToken(token));
     },
     async verifyAppCheckToken(token) {
       await appCheck.verifyToken(token);

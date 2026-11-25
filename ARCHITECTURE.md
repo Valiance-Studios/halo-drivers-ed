@@ -14,7 +14,7 @@ How the app is put together, and the main handoff document between sessions. Cur
 
 ## System Overview
 
-A Vue single-page app served by Firebase Hosting, with its own API on Cloud Run and a PostgreSQL database on Neon. The browser never talks to the database: every request goes through the API, which checks an App Check token, a Firebase ID token and the allowlist. Hosting forwards `/api/**` to the Cloud Run service, so the app and the API share one origin (no CORS).
+A Vue single-page app served by Firebase Hosting, with its own API on Cloud Run and a PostgreSQL database on Neon. The browser never talks to the database: every request goes through the API, which checks an App Check token, a Firebase ID token and the allowlist, and limits each account's requests. Hosting forwards `/api/**` to the Cloud Run service, so the app and the API share one origin (no CORS).
 
 The app is closed: only allowlisted accounts can sign in. Recruiters and hiring managers will get in through self-serve demo slots (see [Planned Design](#planned-design)).
 
@@ -86,7 +86,8 @@ flowchart TB
     end
 
     subgraph api["apps/api"]
-        app["src/app.ts<br/>routes + requireSignedIn"]
+        app["src/app.ts<br/>routes, requireIdentity,<br/>requireAllowed"]
+        limits["src/http/rateLimits.ts<br/>RateLimiter"]
         verifier["src/auth/tokenVerifier.ts"]
         bookingRoutes["src/http/bookingRoutes.ts"]
         service["src/bookings/<br/>BookingService, findSlots"]
@@ -95,6 +96,7 @@ flowchart TB
         repos["src/repositories/<br/>catalog, allowlist, bookings, lessons"]
         db["src/db/<br/>schema, client, migrations, seed"]
         app --> verifier
+        app --> limits
         app --> repos
         app --> bookingRoutes
         bookingRoutes --> service
@@ -116,33 +118,58 @@ The API's routes depend on interfaces (`TokenVerifier`, `CatalogRepository`, `Al
 
 ## Request Authorization
 
-Every route under `/api` except `/api/health` goes through `requireSignedIn` in `apps/api/src/app.ts`. The web app's `ApiClient` attaches both tokens to each request.
+Every route under `/api` except `/api/health` goes through `requireIdentity`, `rateLimit` and `requireAllowed`, set up in `apps/api/src/app.ts`. The web app's `ApiClient` attaches both tokens to each request.
 
 ```mermaid
 sequenceDiagram
     participant B as Browser (ApiClient)
     participant H as Firebase Hosting
-    participant A as hde-api (requireSignedIn)
+    participant A as hde-api (createApp)
     participant P as Postgres
 
     B->>H: GET /api/vehicles<br/>Authorization: Bearer ID token<br/>X-Firebase-AppCheck: token
     H->>A: rewrite /api/**
+    Note right of A: body over 16 KB: 413 request-too-large
     alt APP_CHECK=required
         A->>A: verifyAppCheckToken
         Note right of A: invalid: 401 app-check-failed
     end
     A->>A: verifyIdToken
     Note right of A: missing or invalid: 401 unauthenticated
+    A->>A: RateLimiter.hit(uid)
+    Note right of A: over the limit: 429 rate-limited
     A->>P: SELECT role FROM allowed_users WHERE email = ?
-    Note right of A: no row: 403 not-allowed
+    Note right of A: no row, or no verified email<br/>(not queried): 403 not-allowed
     Note right of A: /api/admin/** and not an admin: 403 not-admin
     A->>P: the route's queries
     A-->>B: 200 JSON
 ```
 
+- An email counts only if the token says it is verified (`toVerifiedUser`). Otherwise, if email/password sign-in were ever enabled, someone could register an allowlisted address.
+- Each account may make 240 requests a minute, 60 of them writes (`DEFAULT_RATE_LIMITS`). The counts are in memory, so with up to 2 Cloud Run instances an account could get twice that. They come before the allowlist query, so a stranger's account cannot load the database either.
+- An ID token stays valid for up to an hour after sign-out, accepted because removing an account from the allowlist takes effect at once.
+
 `APP_CHECK=off` exists only for the emulators. `loadConfig` refuses to start on Cloud Run (`K_SERVICE` set) with App Check off or with `FIREBASE_AUTH_EMULATOR_HOST` set, since either would let anyone in.
 
 On the web side, `stores/auth.ts` calls `GET /api/me` after each Google sign-in. A `not-allowed` answer signs the account out with a message on the login page; other failures keep it signed in so a retry can succeed. The popup and the auth listener share one check.
+
+## Security Headers
+
+`firebase.json` sends a Content Security Policy, `X-Content-Type-Options` and `Referrer-Policy` with the site's own files. What the policy allows, and why:
+
+| Directive | Allows | For |
+| --- | --- | --- |
+| `script-src`, `frame-src`, `connect-src` | `www.google.com/recaptcha/`, `www.gstatic.com/recaptcha/` (scripts) | App Check's reCAPTCHA |
+| `script-src` | `apis.google.com` | The sign-in frame's loader |
+| `frame-src` | `vs-halo-drivers-ed-dev.firebaseapp.com` | The sign-in frame |
+| `connect-src` | `identitytoolkit`, `securetoken` and `content-firebaseappcheck` on `googleapis.com` | Firebase Auth and App Check |
+| `style-src` | `'unsafe-inline'` | PrimeVue adds its styles to the page at runtime, and static hosting cannot give them nonces |
+| `img-src` | `data:` | Small drawings, inlined by Vite |
+
+- The rule's `regex` leaves out `/__/**`, Firebase's own pages: the app frames the sign-in one from another domain, which `frame-ancestors 'none'` would block.
+- `Referrer-Policy` must keep sending the origin, since the API key and reCAPTCHA key check it.
+- There is no `Cross-Origin-Opener-Policy`, which could cut off the sign-in popup.
+- The emulators and the dev server do not send these headers, so changes to them need testing on the deployed site. A production project needs its own `firebaseapp.com` domain in `frame-src`.
 
 ## Booking
 
@@ -334,17 +361,6 @@ One image holds both entry points. Migrations and the catalog seed run as their 
 
 Agreed, not built yet. Build these on their own branches.
 
-### Security Hardening
-
-From a code review (not a penetration test), in one pull request, before demo access opens. Wait for the owner's go-ahead to start it. In order:
-
-1. **Verified emails.** `createFirebaseTokenVerifier` trusts a token's `email` without checking `email_verified`. Google's are verified, but if email/password sign-in were ever enabled, someone could register an allowlisted address. Treat an unverified email as none. Check that the Auth emulator's Google accounts count as verified.
-2. **Security headers.** The site sends only HSTS. Add a Content Security Policy, `frame-ancestors`, `X-Content-Type-Options` and `Referrer-Policy` in `firebase.json`. Test the policy on the deployed site: sign-in (the `firebaseapp.com` popup), App Check and reCAPTCHA load Google scripts and frames, and the emulators do not use Hosting's headers.
-3. **Request size limit.** Hono's `bodyLimit` on `/api`; every body is small JSON.
-4. **Rate limiting** per account, on writes above all. Cloud Run runs up to 2 instances, so an in-memory limit is per instance.
-
-Already covered: parameterized queries (Drizzle; no stored procedures needed), ownership and admin checks with tests, App Check with ID tokens and the allowlist on every route except the health check, bearer tokens rather than cookies (no CSRF), an API database role that can only read and write rows, and database constraints and row locks against races. An ID token stays valid for up to an hour after sign-out, accepted because removing an account from the allowlist takes effect at once.
-
 ### Demo Slots for Recruiters
 
 Self-serve, no code to request:
@@ -365,7 +381,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 | --- | --- | --- |
 | System context | [System Overview](#system-overview) | GCP or Firebase services, Neon, `firebase.json` rewrites, `apps/web/src/plugins/firebase.ts` |
 | Application layers | [Application Layers](#application-layers) | Folders under `apps/*/src`, `packages/shared`, `apps/api/src/server.ts` |
-| Request authorization | [Request Authorization](#request-authorization) | `apps/api/src/app.ts`, `apps/api/src/config.ts`, `apps/web/src/services/apiClient.ts`, `apps/web/src/stores/auth.ts` |
+| Request authorization | [Request Authorization](#request-authorization) | `apps/api/src/app.ts`, `apps/api/src/http/rateLimits.ts`, `apps/api/src/auth/tokenVerifier.ts`, `apps/api/src/config.ts`, `apps/web/src/services/apiClient.ts`, `apps/web/src/stores/auth.ts` |
 | Booking | [Booking](#booking) | `apps/api/src/bookings/`, `apps/api/src/http/bookingRoutes.ts`, `apps/api/src/repositories/bookingRepository.ts`, `packages/shared/src/bookings.ts` |
 | Lesson sign-off | [Lesson Sign-Off](#lesson-sign-off) | `apps/api/src/lessons/`, `apps/api/src/http/lessonRoutes.ts`, `apps/api/src/repositories/lessonRepository.ts`, `packages/shared/src/curriculum.ts` |
 | Theming | [Theming](#theming) | `apps/web/src/stores/theme.ts`, `apps/web/src/utils/themePreference.ts`, `apps/web/src/styles/themes.scss`, `apps/web/src/plugins/primevue.ts`, `FactionToggle.vue`, `ThemeToggle.vue` |
@@ -379,6 +395,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - Monorepo scaffold: web (Vue 3 Options API, PrimeVue 4, Pinia, Router), API (Hono, Drizzle), shared types; Vite+ (Vite, Vitest, Oxlint, Oxfmt), ESLint for Vue components, Playwright, CI.
 - Google sign-in with the allowlist held by the API (`GET /api/me`), and a route guard.
 - API with App Check and ID token checks, JSON errors, and a config that refuses unsafe settings on Cloud Run.
+- Security hardening: verified emails only, request size and per-account rate limits, and [security headers](#security-headers).
 - Postgres schema and first migration: vehicles, prerequisites, instructors, who teaches what, allowlist. Seeded catalog of 10 vehicles and 6 instructors.
 - Courses page: vehicles on a route map of their prerequisites, and instructors, by faction.
 - Locks on courses whose prerequisites are not complete, enforced by the API.
@@ -394,6 +411,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### To Check
 
+- The security hardening is not deployed. Deploy the API and the site, then check on the site that sign-in, App Check and every page work with no policy violations in the browser console, and that `/__/auth/iframe` has no policy.
 - The prompt when leaving a lesson form with unsaved marks has no test.
 - Accounts allowlisted before the `student` role existed are admins, who can sign off everyone's lessons. Change others with `npm run db:allow -- <email> student`.
 
@@ -404,6 +422,5 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### Next: Features
 
-1. [Security hardening](#security-hardening), before demo slots.
-2. [Demo slots for recruiters](#demo-slots-for-recruiters).
-3. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. Flat shapes drawn in code cannot get close. See [Artwork](docs/UI.md#artwork).
+1. [Demo slots for recruiters](#demo-slots-for-recruiters).
+2. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. Flat shapes drawn in code cannot get close. See [Artwork](docs/UI.md#artwork).

@@ -75,7 +75,9 @@ const verifier: TokenVerifier = {
       throw new Error('bad token');
     }
 
-    return {uid: 'uid', email: token.slice('valid-'.length), displayName: 'Pat'};
+    const email = token.slice('valid-'.length);
+
+    return {uid: `uid-${email}`, email, displayName: 'Pat'};
   },
   async verifyAppCheckToken(token) {
     if (token !== 'app') {
@@ -230,6 +232,76 @@ describe('API', () => {
     await get(makeApp({allowlist: {findRole: async () => 'student', rememberName}}), '/api/me', SIGNED_IN);
 
     expect(rememberName).toHaveBeenCalledWith('pat@example.com', 'Pat');
+  });
+
+  it('rejects an account without a verified email', async () => {
+    const response = await get(
+      makeApp({verifier: {...verifier, verifyIdToken: async () => ({uid: 'uid', email: null, displayName: null})}}),
+      '/api/me',
+      SIGNED_IN,
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({error: {code: 'not-allowed'}});
+  });
+
+  it.each([
+    ['with its length declared', (body: string) => ({body, headers: {'Content-Length': String(body.length)}})],
+    ['streamed', (body: string) => ({body: new Blob([body]).stream(), headers: {}, duplex: 'half' as const})],
+  ])('refuses a body that is too large, %s', async (_, makeInit) => {
+    const {headers, ...init} = makeInit(JSON.stringify({padding: 'x'.repeat(16 * 1024)}));
+    const response = await makeApp().request('/api/bookings', {
+      method: 'POST',
+      headers: {...SIGNED_IN, ...headers},
+      ...init,
+    });
+
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({error: {code: 'request-too-large'}});
+  });
+
+  describe('rate limits', () => {
+    const WINDOW_MS = 60_000;
+    const SAM = {...SIGNED_IN, Authorization: 'Bearer valid-sam@example.com'};
+
+    function limited(requests: number, writes: number) {
+      return makeApp({
+        rateLimits: {requests: {max: requests, windowMs: WINDOW_MS}, writes: {max: writes, windowMs: WINDOW_MS}},
+      });
+    }
+
+    it('stops an account that makes too many requests, and not others', async () => {
+      const app = limited(2, 2);
+      await get(app, '/api/vehicles', SIGNED_IN);
+      await get(app, '/api/vehicles', SIGNED_IN);
+      const response = await get(app, '/api/vehicles', SIGNED_IN);
+
+      expect(response.status).toBe(429);
+      expect(await response.json()).toMatchObject({error: {code: 'rate-limited'}});
+      expect(Number(response.headers.get('Retry-After'))).toBeGreaterThan(0);
+      expect((await get(app, '/api/vehicles', SAM)).status).toBe(200);
+    });
+
+    it('limits writes sooner than reads', async () => {
+      const app = limited(10, 1);
+      const cancel = () => app.request(`/api/bookings/${BOOKING.id}/cancel`, {method: 'POST', headers: SIGNED_IN});
+
+      expect((await cancel()).status).toBe(404);
+      expect((await cancel()).status).toBe(429);
+      expect((await get(app, '/api/vehicles', SIGNED_IN)).status).toBe(200);
+    });
+
+    it('limits accounts that are not allowed before reading the allowlist', async () => {
+      const findRole = vi.fn(async () => null);
+      const app = makeApp({
+        allowlist: {findRole, rememberName: async () => {}},
+        rateLimits: {requests: {max: 1, windowMs: WINDOW_MS}, writes: {max: 1, windowMs: WINDOW_MS}},
+      });
+
+      expect((await get(app, '/api/me', SIGNED_IN)).status).toBe(403);
+      expect((await get(app, '/api/me', SIGNED_IN)).status).toBe(429);
+      expect(findRole).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('answers unknown endpoints with a JSON 404', async () => {

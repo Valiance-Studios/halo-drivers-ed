@@ -14,6 +14,8 @@ export const API_ERROR_CODES = [
   'not-admin',
   'not-found',
   'invalid-request',
+  'request-too-large',
+  'rate-limited',
   'course-locked',
   'no-lessons-left',
   'slot-unavailable',
