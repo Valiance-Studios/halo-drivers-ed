@@ -1,11 +1,11 @@
-import type {Booking, BookingRequest, Instructor, LessonSlot, Vehicle} from '@hde/shared';
+import type {Booking, BookingRequest, Instructor, LessonSlot, RescheduleRequest, Vehicle} from '@hde/shared';
 import type {Period} from '#src/bookings/lessonSlots.ts';
 import type {BookingRepository} from '#src/repositories/bookingRepository.ts';
 import type {CatalogRepository} from '#src/repositories/catalogRepository.ts';
 
 import {
   BOOKING_WINDOW_DAYS,
-  canCancel,
+  canChange,
   CANCELLATION_NOTICE_HOURS,
   completedCourses,
   hasLessonBooked,
@@ -16,6 +16,7 @@ import {
 import {findSlots} from '#src/bookings/lessonSlots.ts';
 import {daysPeriod, schoolDate} from '#src/timeOff/schoolDays.ts';
 import {ApiError} from '#src/http/errors.ts';
+import {lessonNotFound} from '#src/http/lessonId.ts';
 
 interface Course {
   vehicle: Vehicle;
@@ -25,7 +26,7 @@ interface Course {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** The rules for booking and cancelling lessons. */
+/** The rules for booking, rescheduling and cancelling lessons. */
 export class BookingService {
   private readonly bookings: BookingRepository;
   private readonly catalog: CatalogRepository;
@@ -43,21 +44,14 @@ export class BookingService {
 
   async slots(email: string, vehicleSlug: string, instructorSlug: string): Promise<LessonSlot[]> {
     const course = await this.findCourse(vehicleSlug, instructorSlug);
-    const slots = await this.freeSlots(email, course);
 
-    return slots.map(({startsAt, endsAt}) => ({startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString()}));
+    return toLessonSlots(await this.freeSlots(email, course));
   }
 
   /** `limit` caps how many lessons the student can ever have, whatever became of them. */
   async book(email: string, request: BookingRequest, limit: number | null = null): Promise<Booking> {
     const course = await this.findCourse(request.vehicleSlug, request.instructorSlug);
-    const startsAt = new Date(request.startsAt).getTime();
-    const slot = (await this.freeSlots(email, course)).find((free) => free.startsAt.getTime() === startsAt);
-
-    if (!slot) {
-      throw slotUnavailable();
-    }
-
+    const slot = findSlot(await this.freeSlots(email, course), request.startsAt);
     const {vehicle, instructor, vehicles} = course;
     const booking = await this.bookings.create(
       {
@@ -99,9 +93,37 @@ export class BookingService {
     return booking;
   }
 
+  /** The times the student's lesson can be moved to, with the same or another instructor. */
+  async rescheduleSlots(email: string, id: string, instructorSlug: string): Promise<LessonSlot[]> {
+    const booking = await this.findChangeable(email, id);
+    const course = await this.findCourse(booking.vehicleSlug, instructorSlug);
+
+    return toLessonSlots(await this.freeSlots(email, course, booking));
+  }
+
+  /** Moves a lesson, which keeps its old time unless it gets the new one. */
+  async reschedule(email: string, id: string, request: RescheduleRequest): Promise<Booking> {
+    const booking = await this.findChangeable(email, id);
+    const course = await this.findCourse(booking.vehicleSlug, request.instructorSlug);
+    const slot = findSlot(await this.freeSlots(email, course, booking), request.startsAt);
+    const moved = await this.bookings.reschedule(
+      email,
+      id,
+      {instructorSlug: course.instructor.slug, ...slot},
+      // Again, since it may have changed meanwhile.
+      (existing) => this.checkChangeable(existing),
+    );
+
+    if (!moved) {
+      throw slotUnavailable();
+    }
+
+    return moved;
+  }
+
   async cancel(email: string, id: string): Promise<Booking> {
     const booking = await this.bookings.cancel(email, id, (existing) => {
-      if (!canCancel(existing, this.now())) {
+      if (!canChange(existing, this.now())) {
         throw new ApiError(
           409,
           'too-late-to-cancel',
@@ -111,7 +133,30 @@ export class BookingService {
     });
 
     if (!booking) {
-      throw new ApiError(404, 'not-found', 'No such lesson.');
+      throw lessonNotFound();
+    }
+
+    return booking;
+  }
+
+  /** The student's own lesson, if they can still reschedule it. */
+  private async findChangeable(email: string, id: string): Promise<Booking> {
+    const booking = (await this.bookings.listForStudent(email)).find((own) => own.id === id);
+
+    return this.checkChangeable(booking ?? null);
+  }
+
+  private checkChangeable(booking: Booking | null): Booking {
+    if (!booking) {
+      throw lessonNotFound();
+    }
+
+    if (!canChange(booking, this.now())) {
+      throw new ApiError(
+        409,
+        'too-late-to-reschedule',
+        `Booked lessons can be rescheduled until ${CANCELLATION_NOTICE_HOURS} hours before they start.`,
+      );
     }
 
     return booking;
@@ -130,19 +175,47 @@ export class BookingService {
     return {vehicle, instructor, vehicles};
   }
 
-  private async freeSlots(email: string, {vehicle, instructor}: Course): Promise<Period[]> {
+  /** When rescheduling `moving`, its own time does not count as busy, but keeping it is not offered. */
+  private async freeSlots(
+    email: string,
+    {vehicle, instructor}: Course,
+    moving: Booking | null = null,
+  ): Promise<Period[]> {
     const from = this.now();
     const until = new Date(from.getTime() + BOOKING_WINDOW_DAYS * DAY_MS);
     const [windows, timeOff, busy] = await Promise.all([
       this.bookings.listAvailability(instructor.slug),
       this.bookings.listTimeOff(instructor.slug, schoolDate(from)),
-      this.bookings.listBusy({studentEmail: email, instructorSlug: instructor.slug, vehicleSlug: vehicle.slug}, from),
+      this.bookings.listBusy(
+        {studentEmail: email, instructorSlug: instructor.slug, vehicleSlug: vehicle.slug},
+        from,
+        moving?.id ?? null,
+      ),
     ]);
 
     const away = timeOff.map(({startsOn, endsOn}) => daysPeriod(startsOn, endsOn));
 
-    return findSlots({windows, lessonMinutes: vehicle.lessonMinutes, from, until, busy: [...busy, ...away]});
+    const slots = findSlots({windows, lessonMinutes: vehicle.lessonMinutes, from, until, busy: [...busy, ...away]});
+
+    return moving?.instructorSlug === instructor.slug
+      ? slots.filter(({startsAt}) => startsAt.toISOString() !== moving.startsAt)
+      : slots;
   }
+}
+
+function toLessonSlots(slots: Period[]): LessonSlot[] {
+  return slots.map(({startsAt, endsAt}) => ({startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString()}));
+}
+
+function findSlot(slots: Period[], startsAt: string): Period {
+  const time = new Date(startsAt).getTime();
+  const slot = slots.find((free) => free.startsAt.getTime() === time);
+
+  if (!slot) {
+    throw slotUnavailable();
+  }
+
+  return slot;
 }
 
 function slotUnavailable(): ApiError {

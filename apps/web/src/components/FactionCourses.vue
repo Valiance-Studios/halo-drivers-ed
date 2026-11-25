@@ -26,7 +26,7 @@
       :vehicle="vehicle"
       :instructors="catalogStore.instructorsFor(vehicle.slug)"
       @close="booking = false"
-      @booked="onBooked"
+      @saved="onBooked"
     />
     <LessonPlan
       v-if="vehicle"

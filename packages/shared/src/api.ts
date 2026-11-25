@@ -23,6 +23,7 @@ export const API_ERROR_CODES = [
   'repeat-due',
   'slot-unavailable',
   'too-late-to-cancel',
+  'too-late-to-reschedule',
   'too-early',
   'sign-off-conflict',
   'time-off-overlap',

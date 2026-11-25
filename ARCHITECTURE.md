@@ -215,7 +215,34 @@ sequenceDiagram
     S-->>D: 201 Booking
 ```
 
-A lesson can be cancelled until 24 hours before it starts. It counts toward its course when completed, and a missed or cancelled lesson can be booked again. While a lesson has to be repeated, only its repeat can be booked: one lesson at a time in that course (`repeatDue`), until it is completed. Lessons already booked when it was marked stay booked, and the soonest becomes the repeat. Completed courses are worked out from the bookings (`completedCourses` in `@hde/shared`), by the API to enforce locks and by `stores/progress.ts` to show them.
+**Rescheduling** moves a lesson to another time, instructor or both, in one transaction, so a student never gives up the old time without getting the new one. It is the same booking, so it keeps any marks and notes, and does not count again toward a course's lessons or a guest's limit. The new time can overlap the old one.
+
+```mermaid
+sequenceDiagram
+    participant D as BookingDialog
+    participant S as BookingService
+    participant R as PostgresBookingRepository
+    participant P as Postgres
+
+    D->>S: GET /api/bookings/:id/slots
+    S-->>D: free times, the lesson's own time not counted as busy
+    D->>S: POST /api/bookings/:id/reschedule
+    S->>S: findSlots
+    Note right of S: not offered: 409 slot-unavailable
+    S->>R: reschedule(time, check)
+    R->>P: BEGIN, SELECT allowed_users FOR UPDATE
+    R->>P: SELECT the lesson FOR UPDATE
+    R->>S: check(lesson)
+    Note right of S: 404 not-found, or<br/>409 too-late-to-reschedule
+    R->>P: SELECT the new instructor FOR SHARE, and time off
+    Note right of R: away: 409 slot-unavailable
+    R->>P: UPDATE bookings: instructor, times
+    Note right of P: overlap (23P01): 409 slot-unavailable
+    R->>P: COMMIT
+    S-->>D: 200 Booking
+```
+
+A lesson can be cancelled or rescheduled until 24 hours before it starts. It counts toward its course when completed, and a missed or cancelled lesson can be booked again. While a lesson has to be repeated, only its repeat can be booked: one lesson at a time in that course (`repeatDue`), until it is completed. Lessons already booked when it was marked stay booked, and the soonest becomes the repeat. Completed courses are worked out from the bookings (`completedCourses` in `@hde/shared`), by the API to enforce locks and by `stores/progress.ts` to show them.
 
 ## Demo
 
@@ -252,7 +279,7 @@ sequenceDiagram
 - **Identity.** A guest is an `allowed_users` row with the role `guest` and a made-up `@demo.invalid` address, so bookings, locks and cascades work as for anyone else. A check constraint ties the role to that domain, where no real address can exist, and the allowlist lookup never returns guests. They are found by the anonymous `uid` in their slot, only until it expires (`demo-ended` after that).
 - **Limits.** Guests are students, and can book `DEMO_BOOKING_LIMIT` lessons, counting cancelled and signed-off ones. The check runs under the same lock as the other booking rules.
 - **Past lessons.** Guests start with the Mongoose course and three of the Warthog's four lessons completed, and the fourth, their latest, to repeat (`demoHistory.ts`). Completing it unlocks the Scorpion and the Hornet. Each slot's are in a week of its own, in free times, so guests never clash.
-- **Expired guests** lose access at once. Their data is deleted by the next claim, or the next request their lessons could affect: `GET /api/slots`, `POST /api/bookings`, `GET /api/admin/lessons` and adding time off (`clearExpiredDemos`). Signing out deletes it immediately.
+- **Expired guests** lose access at once. Their data is deleted by the next claim, or the next request their lessons could affect: `GET /api/slots`, `POST /api/bookings`, rescheduling, `GET /api/admin/lessons` and adding time off (`clearExpiredDemos`). Signing out deletes it immediately.
 - **Anonymous accounts** are deleted by the browser on sign-out, or when the demo is full or over, unless Firebase refuses. A visitor who closes the tab leaves theirs in Firebase; deleting those would need Identity Platform or an API that may delete Firebase users.
 - **In the schedule**, guests' lessons are hidden unless an admin checks "Show demo guests".
 - **A visitor could take every slot** by signing in anonymously repeatedly. App Check makes that harder, and slots free up when they expire.
@@ -285,7 +312,7 @@ sequenceDiagram
     end
 ```
 
-- **Booking waits for time off, and time off for booking.** Booking locks the instructor `FOR SHARE` and then checks for time off. Both lock students before the instructor, so they cannot deadlock.
+- **Booking waits for time off, and time off for booking.** Booking (and rescheduling) locks the instructor `FOR SHARE` and then checks for time off. Both lock students before the instructor, so they cannot deadlock.
 - **Lessons that are over** but not signed off do not get in the way.
 
 ## Lesson Sign-Off
@@ -299,6 +326,7 @@ stateDiagram-v2
     [*] --> booked
     booked --> cancelled: student cancels, 24 hours before
     booked --> cancelled: instructor cancels, with a reason
+    booked --> booked: student reschedules, 24 hours before
     booked --> booked: skill marked or notes saved
     booked --> completed: attended, every skill passed
     booked --> repeat: attended, some not passed
@@ -476,10 +504,6 @@ One image holds both entry points. Migrations and the catalog seed run as their 
 
 Agreed, not built yet. Build these on their own branches, in this order.
 
-### Rescheduling
-
-A student moves a lesson to another time in one transaction, under the same 24-hour rule, rather than giving up the old time before they have the new one.
-
 ### Certificates
 
 A license for each completed course. Once its lessons are all completed:
@@ -500,7 +524,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 | System context | [System Overview](#system-overview) | GCP or Firebase services, Neon, `firebase.json` rewrites, `apps/web/src/plugins/firebase.ts` |
 | Application layers | [Application Layers](#application-layers) | Folders under `apps/*/src`, `packages/shared`, `apps/api/src/server.ts` |
 | Request authorization | [Request Authorization](#request-authorization) | `apps/api/src/app.ts`, `apps/api/src/http/rateLimits.ts`, `apps/api/src/auth/tokenVerifier.ts`, `apps/api/src/config.ts`, `apps/web/src/services/apiClient.ts`, `apps/web/src/stores/auth.ts` |
-| Booking | [Booking](#booking) | `apps/api/src/bookings/`, `apps/api/src/http/bookingRoutes.ts`, `apps/api/src/repositories/bookingRepository.ts`, `packages/shared/src/bookings.ts` |
+| Booking, rescheduling | [Booking](#booking) | `apps/api/src/bookings/`, `apps/api/src/http/bookingRoutes.ts`, `apps/api/src/repositories/bookingRepository.ts`, `packages/shared/src/bookings.ts` |
 | Demo | [Demo](#demo) | `apps/api/src/http/demoRoutes.ts`, `apps/api/src/repositories/demoRepository.ts`, `apps/api/src/demo/`, `packages/shared/src/demo.ts`, `apps/web/src/stores/auth.ts` |
 | Time off | [Time Off](#time-off) | `apps/api/src/timeOff/`, `apps/api/src/http/timeOffRoutes.ts`, `apps/api/src/repositories/timeOffRepository.ts`, `apps/web/src/components/TimeOffPanel.vue` |
 | Lesson sign-off | [Lesson Sign-Off](#lesson-sign-off) | `apps/api/src/lessons/`, `apps/api/src/http/lessonRoutes.ts`, `apps/api/src/repositories/lessonRepository.ts`, `packages/shared/src/curriculum.ts` |
@@ -524,6 +548,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - Lesson plans (53 lessons), instructors' lesson forms, sign-off that unlocks courses, notes and student history (deployed and tried on the site on 2026-11-24), and admins' schedule with View As. Demo guests have the same for their own lessons. Deployed and tried on the site on 2026-11-24.
 - Instructors' [time off](#time-off), and cancelling lessons on their behalf. Deployed and tried on the site on 2026-11-24.
 - `npm run db:clear`, to delete everyone's, a student's or an instructor's data.
+- [Rescheduling](#booking) a lesson. Not deployed yet.
 - A `student` role, which can book but not sign off.
 - [Demo](#demo) slots for recruiters: 10 at once, 2 hours each. Deployed and tried on the site on 2026-11-24, including that signing out removes the anonymous account.
 - UNSC and Covenant themes, each light and dark, with placeholder artwork.
@@ -545,6 +570,5 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### Next: Features
 
-1. [Rescheduling](#rescheduling).
-2. [Certificates](#certificates).
-3. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. Flat shapes drawn in code cannot get close. See [Artwork](docs/UI.md#artwork).
+1. [Certificates](#certificates).
+2. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. Flat shapes drawn in code cannot get close. See [Artwork](docs/UI.md#artwork).

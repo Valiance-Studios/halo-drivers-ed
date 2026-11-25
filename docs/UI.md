@@ -33,11 +33,11 @@ The catalog loads once per visit; a failure shows an error message in place of t
 
 ### Booking a Lesson
 
-A dialog to choose an instructor, a day and a time in the next 14 days, in the viewer's time zone. It warns when a lesson starts too soon to be cancelled. If the time was just taken, it says so and loads the times again.
+A dialog to choose an instructor, a day and a time in the next 14 days, in the viewer's time zone. It warns when a lesson starts too soon to be cancelled or rescheduled. If the time was just taken, it says so and loads the times again.
 
 ## My Lessons (`/lessons`)
 
-**Upcoming** lessons, then **Past and cancelled** ones, with the vehicle, time, instructor and status. One cancelled by its instructor says so, with the reason. An upcoming lesson can be cancelled until 24 hours before it starts. **See results** shows how each skill went in a lesson that was signed off as attended, and the instructor's note.
+**Upcoming** lessons, then **Past and cancelled** ones, with the vehicle, time, instructor and status. One cancelled by its instructor says so, with the reason. An upcoming lesson can be cancelled or rescheduled until 24 hours before it starts. **Reschedule** opens the booking dialog with the lesson's instructor chosen; it can be moved to another time, instructor or both, and keeps its old time until then. **See results** shows how each skill went in a lesson that was signed off as attended, and the instructor's note.
 
 ## Schedule (`/schedule`)
 

@@ -1,4 +1,4 @@
-import type {AttendedLesson, Booking, BookingRequest} from '@hde/shared';
+import type {AttendedLesson, Booking, BookingRequest, RescheduleRequest} from '@hde/shared';
 
 import {defineStore} from 'pinia';
 import {api} from '@/services/api';
@@ -41,9 +41,18 @@ export const useBookingsStore = defineStore('bookings', {
       return booking;
     },
     /** Throws the API's error, for the page to show. */
+    async reschedule(id: string, request: RescheduleRequest): Promise<Booking> {
+      const moved = await api.rescheduleBooking(id, request);
+      this.replace(moved);
+
+      return moved;
+    },
+    /** Throws the API's error, for the page to show. */
     async cancel(id: string): Promise<void> {
-      const cancelled = await api.cancelBooking(id);
-      this.replaceAll(this.bookings.map((booking) => (booking.id === id ? cancelled : booking)));
+      this.replace(await api.cancelBooking(id));
+    },
+    replace(changed: Booking): void {
+      this.replaceAll(this.bookings.map((booking) => (booking.id === changed.id ? changed : booking)));
     },
     replaceAll(bookings: Booking[]): void {
       this.bookings = [...bookings].sort((a, b) => a.startsAt.localeCompare(b.startsAt));

@@ -49,6 +49,7 @@ const bookingRepository: BookingRepository = {
   listTimeOff: async () => [],
   listBusy: async () => [],
   create: async () => null,
+  reschedule: async () => null,
   cancel: async () => null,
 };
 const LESSON: CourseLesson = {
@@ -196,6 +197,29 @@ describe('API', () => {
 
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({error: {code: 'invalid-request'}});
+    },
+  );
+
+  it.each(['not json', '{}', '{"instructorSlug":"sergeant-johnson","startsAt":"soon"}'])(
+    'rejects the reschedule request %s',
+    async (body) => {
+      const path = `/api/bookings/${BOOKING.id}/reschedule`;
+      const response = await makeApp().request(path, {method: 'POST', headers: SIGNED_IN, body});
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({error: {code: 'invalid-request'}});
+    },
+  );
+
+  it.each(['not-a-uuid', '5d0a3f0e-6a53-4a5b-9d3c-2f7c1f0f9a10'])(
+    'answers rescheduling an unknown lesson (%s) with a 404',
+    async (id) => {
+      const path = `/api/bookings/${id}`;
+      const body = JSON.stringify({instructorSlug: 'sergeant-johnson', startsAt: BOOKING.startsAt});
+      const init = {method: 'POST', headers: SIGNED_IN, body};
+
+      expect((await get(makeApp(), `${path}/slots?instructor=sergeant-johnson`, SIGNED_IN)).status).toBe(404);
+      expect((await makeApp().request(`${path}/reschedule`, init)).status).toBe(404);
     },
   );
 

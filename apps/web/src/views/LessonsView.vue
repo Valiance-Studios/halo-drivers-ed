@@ -7,6 +7,12 @@
     >
       {{ errorMessage }}
     </Message>
+    <Message
+      v-if="notice"
+      severity="success"
+    >
+      {{ notice }}
+    </Message>
     <ProgressSpinner
       v-if="!ready && !errorMessage"
       class="lessons__spinner"
@@ -19,19 +25,30 @@
         :lessons="upcoming"
       >
         <template #actions="{lesson}">
-          <Button
-            v-if="canCancel(lesson, now)"
-            label="Cancel lesson"
-            severity="secondary"
-            outlined
-            :loading="cancellingId === lesson.id"
-            @click="cancel(lesson.id)"
-          />
+          <div
+            v-if="canChange(lesson, now)"
+            class="lessons__actions"
+          >
+            <Button
+              label="Reschedule"
+              severity="secondary"
+              outlined
+              :disabled="cancellingId === lesson.id"
+              @click="openReschedule(lesson)"
+            />
+            <Button
+              label="Cancel lesson"
+              severity="secondary"
+              outlined
+              :loading="cancellingId === lesson.id"
+              @click="cancel(lesson.id)"
+            />
+          </div>
           <span
             v-else
             class="lessons__muted"
           >
-            Too late to cancel
+            Too late to change
           </span>
         </template>
       </LessonList>
@@ -60,6 +77,14 @@
           </template>
         </LessonList>
       </template>
+      <BookingDialog
+        v-if="rescheduling && reschedulingVehicle"
+        :vehicle="reschedulingVehicle"
+        :instructors="catalogStore.instructorsFor(reschedulingVehicle.slug)"
+        :lesson="rescheduling"
+        @close="closeReschedule"
+        @saved="onRescheduled"
+      />
       <LessonResults
         v-if="resultsId"
         :lesson-id="resultsId"
@@ -70,22 +95,31 @@
 </template>
 
 <script lang="ts">
-import type {Booking} from '@hde/shared';
+import type {Booking, Vehicle} from '@hde/shared';
 
 import {defineComponent} from 'vue';
 import {mapStores} from 'pinia';
-import {canCancel} from '@hde/shared';
+import {canChange} from '@hde/shared';
 import {useBookingsStore} from '@/stores/bookings';
 import {useCatalogStore} from '@/stores/catalog';
+import {lessonDayAndTime} from '@/utils/lessonTime';
+import BookingDialog from '@/components/BookingDialog.vue';
 import LessonList from '@/components/LessonList.vue';
 import LessonResults from '@/components/LessonResults.vue';
 
 /** The student's lessons: what is coming up, and the rest. */
 export default defineComponent({
   name: 'LessonsView',
-  components: {LessonList, LessonResults},
+  components: {BookingDialog, LessonList, LessonResults},
   data() {
-    return {now: new Date(), cancellingId: '', cancelError: '', resultsId: ''};
+    return {
+      now: new Date(),
+      cancellingId: '',
+      cancelError: '',
+      notice: '',
+      rescheduling: null as Booking | null,
+      resultsId: '',
+    };
   },
   computed: {
     ...mapStores(useBookingsStore, useCatalogStore),
@@ -94,6 +128,9 @@ export default defineComponent({
     },
     errorMessage(): string | null {
       return this.cancelError || this.bookingsStore.errorMessage || this.catalogStore.errorMessage;
+    },
+    reschedulingVehicle(): Vehicle | undefined {
+      return this.catalogStore.vehicles.find(({slug}) => slug === this.rescheduling?.vehicleSlug);
     },
     upcoming(): Booking[] {
       return this.bookingsStore.bookings.filter((booking) => this.isUpcoming(booking));
@@ -108,13 +145,27 @@ export default defineComponent({
     void this.bookingsStore.load();
   },
   methods: {
-    canCancel,
+    canChange,
     isUpcoming({status, endsAt}: Booking): boolean {
       return status === 'booked' && new Date(endsAt) > this.now;
+    },
+    openReschedule(lesson: Booking) {
+      this.notice = '';
+      this.cancelError = '';
+      this.rescheduling = lesson;
+    },
+    closeReschedule() {
+      this.rescheduling = null;
+      this.now = new Date();
+    },
+    onRescheduled({instructorSlug, startsAt}: Booking) {
+      this.closeReschedule();
+      this.notice = `Rescheduled with ${this.catalogStore.instructorName(instructorSlug)}: ${lessonDayAndTime(startsAt)}.`;
     },
     async cancel(id: string) {
       this.cancellingId = id;
       this.cancelError = '';
+      this.notice = '';
 
       try {
         await this.bookingsStore.cancel(id);
@@ -143,6 +194,12 @@ export default defineComponent({
   &__subheading {
     margin: 1.75rem 0 1rem;
     font-size: 1.6875rem;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
   }
 
   &__muted {
