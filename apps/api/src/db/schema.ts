@@ -2,6 +2,7 @@ import {sql} from 'drizzle-orm';
 import {
   boolean,
   check,
+  date,
   foreignKey,
   index,
   integer,
@@ -158,6 +159,23 @@ export const instructorAvailability = pgTable(
   ],
 );
 
+/**
+ * Days an instructor is away, both included. An exclusion constraint in the time_off_exclusion migration keeps an
+ * instructor's from overlapping. Adding some locks the instructor, as booking does, so neither misses the other.
+ */
+export const instructorTimeOff = pgTable(
+  'instructor_time_off',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    instructorSlug: text()
+      .notNull()
+      .references(() => instructors.slug, {onDelete: 'cascade'}),
+    startsOn: date().notNull(),
+    endsOn: date().notNull(),
+  },
+  (table) => [check('instructor_time_off_order', sql`${table.startsOn} <= ${table.endsOn}`)],
+);
+
 /** Each course's lessons. Ones dropped from the seed data stay, since bookings may refer to them. */
 export const courseLessons = pgTable(
   'course_lessons',
@@ -217,6 +235,8 @@ export const bookings = pgTable(
     /** For the student to read, and only for instructors. Empty if there are none. */
     studentNote: text().notNull().default(''),
     privateNote: text().notNull().default(''),
+    /** Why the instructor cancelled it; null if the student did, or it is not cancelled. */
+    cancelReason: text(),
     signedOffBy: text(),
     signedOffAt: timestamp({withTimezone: true}),
     createdAt: timestamp({withTimezone: true}).notNull().defaultNow(),
@@ -232,6 +252,10 @@ export const bookings = pgTable(
       columns: [table.vehicleSlug, table.faction],
       foreignColumns: [vehicles.slug, vehicles.faction],
     }),
+    check(
+      'bookings_cancel_reason',
+      sql`${table.cancelReason} is null or (${table.status} = 'cancelled' and char_length(${table.cancelReason}) between 1 and 500)`,
+    ),
     check(
       'bookings_note_length',
       sql`char_length(${table.studentNote}) <= 1000 and char_length(${table.privateNote}) <= 1000`,

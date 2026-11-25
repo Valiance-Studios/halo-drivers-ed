@@ -14,6 +14,7 @@ import {
   repeatDue,
 } from '@hde/shared';
 import {findSlots} from '#src/bookings/lessonSlots.ts';
+import {daysPeriod, schoolDate} from '#src/timeOff/schoolDays.ts';
 import {ApiError} from '#src/http/errors.ts';
 
 interface Course {
@@ -132,12 +133,15 @@ export class BookingService {
   private async freeSlots(email: string, {vehicle, instructor}: Course): Promise<Period[]> {
     const from = this.now();
     const until = new Date(from.getTime() + BOOKING_WINDOW_DAYS * DAY_MS);
-    const [windows, busy] = await Promise.all([
+    const [windows, timeOff, busy] = await Promise.all([
       this.bookings.listAvailability(instructor.slug),
+      this.bookings.listTimeOff(instructor.slug, schoolDate(from)),
       this.bookings.listBusy({studentEmail: email, instructorSlug: instructor.slug, vehicleSlug: vehicle.slug}, from),
     ]);
 
-    return findSlots({windows, lessonMinutes: vehicle.lessonMinutes, from, until, busy});
+    const away = timeOff.map(({startsOn, endsOn}) => daysPeriod(startsOn, endsOn));
+
+    return findSlots({windows, lessonMinutes: vehicle.lessonMinutes, from, until, busy: [...busy, ...away]});
   }
 }
 

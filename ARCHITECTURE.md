@@ -94,8 +94,10 @@ flowchart TB
         demoRoutes["src/http/demoRoutes.ts"]
         demo["src/demo/<br/>demoHistory"]
         lessonRoutes["src/http/lessonRoutes.ts<br/>+ requireAdmin, requireGuest"]
+        timeOffRoutes["src/http/timeOffRoutes.ts<br/>+ requireAdmin"]
+        timeOffService["src/timeOff/<br/>TimeOffService, schoolDays"]
         lessonService["src/lessons/<br/>LessonService"]
-        repos["src/repositories/<br/>catalog, allowlist, bookings,<br/>demo, lessons"]
+        repos["src/repositories/<br/>catalog, allowlist, bookings,<br/>demo, lessons, timeOff"]
         db["src/db/<br/>schema, client, migrations, seed"]
         app --> verifier
         app --> limits
@@ -109,6 +111,10 @@ flowchart TB
         app --> lessonRoutes
         lessonRoutes --> lessonService
         lessonService --> repos
+        app --> timeOffRoutes
+        timeOffRoutes --> timeOffService
+        timeOffService --> repos
+        service -- "schoolDays" --> timeOffService
         repos --> db
     end
 
@@ -119,7 +125,7 @@ flowchart TB
     api -. "imports types and constants" .-> shared
 ```
 
-The API's routes depend on interfaces (`TokenVerifier`, `CatalogRepository`, `AllowlistRepository`, `BookingRepository`, `DemoRepository`, `LessonRepository`), and `src/server.ts` wires in the Firebase and Postgres implementations. The unit tests pass fakes instead, so they need neither Firebase nor a database.
+The API's routes depend on interfaces (`TokenVerifier`, `CatalogRepository`, `AllowlistRepository`, `BookingRepository`, `DemoRepository`, `LessonRepository`, `TimeOffRepository`), and `src/server.ts` wires in the Firebase and Postgres implementations. The unit tests pass fakes instead, so they need neither Firebase nor a database.
 
 ## Request Authorization
 
@@ -183,7 +189,7 @@ On the web side, `stores/auth.ts` calls `GET /api/me` after each Google sign-in.
 
 ## Booking
 
-`GET /api/slots` offers times from the instructor's hours, half an hour apart, for the next 14 days, leaving out any that clash with a lesson of the student, instructor or vehicle. `POST /api/bookings` checks the time is still offered, then books it in a transaction. The student's `allowed_users` row is locked for the prerequisite and lesson-count checks, so two requests cannot both pass them; the exclusion constraints settle races between students.
+`GET /api/slots` offers times from the instructor's hours, half an hour apart, for the next 14 days, leaving out [time off](#time-off) and any that clash with a lesson of the student, instructor or vehicle. `POST /api/bookings` checks the time is still offered, then books it in a transaction. The student's `allowed_users` row is locked for the prerequisite and lesson-count checks, so two requests cannot both pass them; the exclusion constraints settle races between students.
 
 ```mermaid
 sequenceDiagram
@@ -193,7 +199,7 @@ sequenceDiagram
     participant P as Postgres
 
     D->>S: POST /api/bookings
-    S->>R: listAvailability, listBusy
+    S->>R: listAvailability, listTimeOff, listBusy
     S->>S: findSlots
     Note right of S: not offered: 409 slot-unavailable
     S->>R: create(booking, check)
@@ -201,6 +207,8 @@ sequenceDiagram
     R->>P: SELECT the student's bookings
     R->>S: check(existing)
     Note right of S: 409 course-locked, repeat-due<br/>or no-lessons-left
+    R->>P: SELECT the instructor FOR SHARE, and time off
+    Note right of R: away: 409 slot-unavailable
     R->>P: INSERT INTO bookings
     Note right of P: overlap (23P01): 409 slot-unavailable
     R->>P: COMMIT
@@ -244,10 +252,41 @@ sequenceDiagram
 - **Identity.** A guest is an `allowed_users` row with the role `guest` and a made-up `@demo.invalid` address, so bookings, locks and cascades work as for anyone else. A check constraint ties the role to that domain, where no real address can exist, and the allowlist lookup never returns guests. They are found by the anonymous `uid` in their slot, only until it expires (`demo-ended` after that).
 - **Limits.** Guests are students, and can book `DEMO_BOOKING_LIMIT` lessons, counting cancelled and signed-off ones. The check runs under the same lock as the other booking rules.
 - **Past lessons.** Guests start with the Mongoose course and three of the Warthog's four lessons completed, and the fourth, their latest, to repeat (`demoHistory.ts`). Completing it unlocks the Scorpion and the Hornet. Each slot's are in a week of its own, in free times, so guests never clash.
-- **Expired guests** lose access at once. Their data is deleted by the next claim, or the next request their lessons could affect: `GET /api/slots`, `POST /api/bookings` and `GET /api/admin/lessons` (`clearExpiredDemos`). Signing out deletes it immediately.
+- **Expired guests** lose access at once. Their data is deleted by the next claim, or the next request their lessons could affect: `GET /api/slots`, `POST /api/bookings`, `GET /api/admin/lessons` and adding time off (`clearExpiredDemos`). Signing out deletes it immediately.
 - **Anonymous accounts** are deleted by the browser on sign-out, or when the demo is full or over, unless Firebase refuses. A visitor who closes the tab leaves theirs in Firebase; deleting those would need Identity Platform or an API that may delete Firebase users.
 - **In the schedule**, guests' lessons are hidden unless an admin checks "Show demo guests".
 - **A visitor could take every slot** by signing in anonymously repeatedly. App Check makes that harder, and slots free up when they expire.
+
+## Time Off
+
+Admins add whole days an instructor is away, in the school's time zone, from the Schedule. Those days are left out of `GET /api/slots`, and booking refuses them. Demo guests cannot add any, since instructors are shared.
+
+```mermaid
+sequenceDiagram
+    participant T as TimeOffPanel
+    participant S as TimeOffService
+    participant R as PostgresTimeOffRepository
+    participant P as Postgres
+
+    T->>S: POST /api/admin/instructors/:slug/time-off
+    S->>R: add(days, lessons to cancel)
+    R->>P: BEGIN, SELECT the booked lessons in those days
+    R->>P: SELECT their students (allowed_users) FOR UPDATE
+    R->>P: SELECT the instructor FOR UPDATE
+    R->>P: SELECT the booked lessons again
+    alt one is not in the list to cancel
+        R-->>T: not saved, with the lessons
+    else
+        R->>P: UPDATE bookings: cancelled, with the reason
+        R->>P: INSERT INTO instructor_time_off
+        Note right of P: overlap (23P01): 409 time-off-overlap
+        R->>P: COMMIT
+        R-->>T: saved
+    end
+```
+
+- **Booking waits for time off, and time off for booking.** Booking locks the instructor `FOR SHARE` and then checks for time off. Both lock students before the instructor, so they cannot deadlock.
+- **Lessons that are over** but not signed off do not get in the way.
 
 ## Lesson Sign-Off
 
@@ -259,6 +298,7 @@ The scope is `admin` for admins (`requireAdmin`), who sign off everyone's lesson
 stateDiagram-v2
     [*] --> booked
     booked --> cancelled: student cancels, 24 hours before
+    booked --> cancelled: instructor cancels, with a reason
     booked --> booked: skill marked or notes saved
     booked --> completed: attended, every skill passed
     booked --> repeat: attended, some not passed
@@ -272,6 +312,7 @@ stateDiagram-v2
 ```
 
 - Only `completed` counts toward the course. After `repeat`, the next lesson has the same form, with the skills already passed kept.
+- **Cancelling.** `PUT .../cancel` cancels a lesson on the instructor's behalf, any time until it is signed off, with a reason the student sees (`cancelReason`). It discards the marks. Guests' limit still counts it.
 - **Notes.** A lesson has a note for the student and a private one, saved together (`PUT .../notes`) from when the lesson starts, apart from the marks, and corrected by signing off again. Students get only their own note, in `LessonForm`, once the lesson is signed off as attended. `InstructorForm` adds the private one and the history.
 - **History.** An instructor's form has the student's earlier signed-off lessons in the course, with results and notes. The student's own results (`GET /api/results`) are shown in the courses page's lesson plan.
 - Lessons in a course are signed off in order, and one can be corrected until a later one is signed off.
@@ -342,9 +383,16 @@ erDiagram
         int lesson_number FK
         text student_note
         text private_note
+        text cancel_reason
         text signed_off_by
         timestamptz signed_off_at
         timestamptz created_at
+    }
+    instructor_time_off {
+        uuid id PK
+        text instructor_slug FK
+        date starts_on
+        date ends_on
     }
     course_lessons {
         text vehicle_slug PK,FK
@@ -386,6 +434,7 @@ erDiagram
     instructors ||--o{ instructor_vehicles : "teaches"
     vehicles ||--o{ instructor_vehicles : "is taught in"
     instructors ||--o{ instructor_availability : "teaches during"
+    instructors ||--o{ instructor_time_off : "is away during"
     allowed_users ||--o{ bookings : "books"
     instructors ||--o{ bookings : "teaches"
     vehicles ||--o{ bookings : "is used in"
@@ -402,7 +451,8 @@ erDiagram
 - `instructor_availability` holds wall-clock times in `America/New_York`, seeded from `apps/api/src/db/availabilityData.ts`.
 - `allowed_users.display_name` is the Google account's name, stored by `GET /api/me` at sign-in, so instructors can see who a student is.
 - `course_lessons` and `lesson_skills` are seeded from `apps/api/src/db/curriculumData.ts`. A skill dropped from the data becomes inactive rather than deleted, since results refer to it, so skill ids must not be reused.
-- Checks on `bookings` require a signature on signed-off lessons, and a lesson number on attended ones, and limit the notes to 1,000 characters each.
+- Checks on `bookings` require a signature on signed-off lessons, and a lesson number on attended ones, and limit the notes to 1,000 characters each. Only a cancelled lesson can have a `cancel_reason`.
+- `instructor_time_off` has an exclusion constraint (migration `0008_time_off_exclusion`): an instructor's time off cannot overlap.
 - The catalog (vehicles, instructors, who teaches what) is seed data in `apps/api/src/db/catalogData.ts`, loaded by `npm run db:seed`. Instructors are seeded characters, not accounts.
 - Schema changes: edit `apps/api/src/db/schema.ts`, run `npm run db:generate`, and commit the new file in `apps/api/drizzle/`.
 
@@ -424,11 +474,6 @@ One image holds both entry points. Migrations and the catalog seed run as their 
 ## Planned Design
 
 Agreed, not built yet. Build these on their own branches, in this order.
-
-### Instructor Cancellation and Time Off
-
-- An instructor's side can cancel a lesson, with a reason. Only students can today, so an instructor's absence is left booked or recorded as `missed`, which wrongly blames the student.
-- Time off for an instructor on given dates. Hours are only weekly seed data.
 
 ### Rescheduling
 
@@ -456,6 +501,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 | Request authorization | [Request Authorization](#request-authorization) | `apps/api/src/app.ts`, `apps/api/src/http/rateLimits.ts`, `apps/api/src/auth/tokenVerifier.ts`, `apps/api/src/config.ts`, `apps/web/src/services/apiClient.ts`, `apps/web/src/stores/auth.ts` |
 | Booking | [Booking](#booking) | `apps/api/src/bookings/`, `apps/api/src/http/bookingRoutes.ts`, `apps/api/src/repositories/bookingRepository.ts`, `packages/shared/src/bookings.ts` |
 | Demo | [Demo](#demo) | `apps/api/src/http/demoRoutes.ts`, `apps/api/src/repositories/demoRepository.ts`, `apps/api/src/demo/`, `packages/shared/src/demo.ts`, `apps/web/src/stores/auth.ts` |
+| Time off | [Time Off](#time-off) | `apps/api/src/timeOff/`, `apps/api/src/http/timeOffRoutes.ts`, `apps/api/src/repositories/timeOffRepository.ts`, `apps/web/src/components/TimeOffPanel.vue` |
 | Lesson sign-off | [Lesson Sign-Off](#lesson-sign-off) | `apps/api/src/lessons/`, `apps/api/src/http/lessonRoutes.ts`, `apps/api/src/repositories/lessonRepository.ts`, `packages/shared/src/curriculum.ts` |
 | Theming | [Theming](#theming) | `apps/web/src/stores/theme.ts`, `apps/web/src/utils/themePreference.ts`, `apps/web/src/styles/themes.scss`, `apps/web/src/plugins/primevue.ts`, `FactionToggle.vue`, `ThemeToggle.vue` |
 | Tables | [Data Model](#data-model) | `apps/api/src/db/schema.ts`, `apps/api/drizzle/` |
@@ -475,6 +521,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - Course progress on the route map and in the vehicle's panel, and repeats before the next lesson.
 - Booking: instructor hours, lesson times, booking and cancelling, My lessons, and exclusion constraints against double-booking.
 - Lesson plans (53 lessons), instructors' lesson forms, sign-off that unlocks courses, notes and student history (deployed and tried on the site on 2026-11-24), and admins' schedule with View As. Demo guests have the same for their own lessons. Deployed and tried on the site on 2026-11-24.
+- Instructors' [time off](#time-off), and cancelling lessons on their behalf.
 - A `student` role, which can book but not sign off.
 - [Demo](#demo) slots for recruiters: 10 at once, 2 hours each. Deployed and tried on the site on 2026-11-24, including that signing out removes the anonymous account.
 - UNSC and Covenant themes, each light and dark, with placeholder artwork.
@@ -486,6 +533,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### To Check
 
+- Time off and cancelling on an instructor's behalf are not deployed. Deploy the API, then the site, and try both.
 - The prompt when leaving a lesson form with unsaved marks has no test.
 - Accounts allowlisted before the `student` role existed are admins, who can sign off everyone's lessons. Change others with `npm run db:allow -- <email> student`.
 
@@ -496,7 +544,6 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### Next: Features
 
-1. [Instructor cancellation and time off](#instructor-cancellation-and-time-off).
-2. [Rescheduling](#rescheduling).
-3. [Certificates](#certificates).
-4. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. Flat shapes drawn in code cannot get close. See [Artwork](docs/UI.md#artwork).
+1. [Rescheduling](#rescheduling).
+2. [Certificates](#certificates).
+3. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. Flat shapes drawn in code cannot get close. See [Artwork](docs/UI.md#artwork).

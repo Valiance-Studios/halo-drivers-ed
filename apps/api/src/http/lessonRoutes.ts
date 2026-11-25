@@ -6,6 +6,7 @@ import {Hono} from 'hono';
 import {ATTENDANCES, NOTE_MAX_LENGTH, SKILL_RESULTS} from '@hde/shared';
 import {ApiError} from '#src/http/errors.ts';
 import {lessonId} from '#src/http/lessonId.ts';
+import {parseReason} from '#src/http/reason.ts';
 import {requireAdmin, requireGuest} from '#src/http/signedIn.ts';
 
 function isSkillResults(value: unknown): value is SkillResults {
@@ -112,6 +113,12 @@ function signOffRoutes(service: LessonService, studentFor: (me: Me) => string | 
       await service.saveNotes(lessonId(c.req.param('id')), request, studentFor(c.var.me));
 
       return c.json(request.notes);
+    })
+    .put('/lessons/:id/cancel', async (c) => {
+      const body = (await c.req.json().catch(() => null)) as {reason?: unknown} | null;
+      const reason = parseReason(body?.reason);
+
+      return c.json(await service.cancel(lessonId(c.req.param('id')), reason, studentFor(c.var.me)));
     })
     .put('/lessons/:id/sign-off', async (c) => {
       const signOff = parseSignOff(await c.req.json().catch(() => null));

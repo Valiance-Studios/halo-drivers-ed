@@ -17,6 +17,9 @@ import type {
   NotesRequest,
   SignOffScope,
   SkillMark,
+  TimeOff,
+  TimeOffAnswer,
+  TimeOffRequest,
   Vehicle,
 } from '@hde/shared';
 
@@ -131,6 +134,23 @@ export class ApiClient {
 
   saveNotes(scope: SignOffScope, id: string, request: NotesRequest): Promise<LessonNotes> {
     return this.put(`/${scope}/lessons/${encodeURIComponent(id)}/notes`, request);
+  }
+
+  /** Cancels a lesson on its instructor's behalf. */
+  cancelLesson(scope: SignOffScope, id: string, reason: string): Promise<AdminLesson> {
+    return this.put(`/${scope}/lessons/${encodeURIComponent(id)}/cancel`, {reason});
+  }
+
+  listTimeOff(instructorSlug: string): Promise<TimeOff[]> {
+    return this.get(`/admin/instructors/${encodeURIComponent(instructorSlug)}/time-off`);
+  }
+
+  addTimeOff(instructorSlug: string, request: TimeOffRequest): Promise<TimeOffAnswer> {
+    return this.post(`/admin/instructors/${encodeURIComponent(instructorSlug)}/time-off`, request);
+  }
+
+  async removeTimeOff(id: string): Promise<void> {
+    await this.send(`/admin/time-off/${encodeURIComponent(id)}`, {method: 'DELETE'});
   }
 
   signOffLesson(scope: SignOffScope, id: string, signOff: LessonSignOff): Promise<AdminLesson> {

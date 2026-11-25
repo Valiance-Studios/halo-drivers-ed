@@ -4,6 +4,12 @@
       <h1 class="schedule__heading">Schedule</h1>
       <ViewAsSelect />
     </div>
+    <TimeOffPanel
+      v-if="!isDemo && viewAsStore.instructorSlug"
+      :key="viewAsStore.instructorSlug"
+      :instructor-slug="viewAsStore.instructorSlug"
+      @cancelled="load"
+    />
     <p
       v-if="isDemo"
       class="schedule__note"
@@ -71,6 +77,7 @@ import {useAuthStore} from '@/stores/auth';
 import {useCatalogStore} from '@/stores/catalog';
 import {useViewAsStore} from '@/stores/viewAs';
 import LessonList from '@/components/LessonList.vue';
+import TimeOffPanel from '@/components/TimeOffPanel.vue';
 import ViewAsSelect from '@/components/ViewAsSelect.vue';
 
 interface LessonGroup {
@@ -82,7 +89,7 @@ interface LessonGroup {
 /** For admins, an instructor's lessons or everyone's, and for demo guests their own, by what they need. */
 export default defineComponent({
   name: 'ScheduleView',
-  components: {LessonList, ViewAsSelect},
+  components: {LessonList, TimeOffPanel, ViewAsSelect},
   data() {
     return {lessons: [] as AdminLesson[], loading: true, errorMessage: '', now: new Date(), showGuests: false};
   },

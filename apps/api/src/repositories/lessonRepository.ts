@@ -29,6 +29,8 @@ export interface LessonChange {
   results: SkillResults | null;
   /** Null leaves the notes as they are. */
   notes: LessonNotes | null;
+  /** Cancels the lesson, for this reason. */
+  cancelReason?: string;
   /** Null leaves the lesson as it is, saving only the results and notes. */
   signOff: {status: BookingStatus; lessonNumber: number | null; by: string; at: Date} | null;
 }
@@ -46,7 +48,7 @@ export interface LessonRepository {
   update(id: string, decide: (context: LessonContext) => LessonChange): Promise<AdminLesson | null>;
 }
 
-function toAdminLesson(row: BookingRow, studentName: string | null): AdminLesson {
+export function toAdminLesson(row: BookingRow, studentName: string | null): AdminLesson {
   return {...toBooking(row), studentEmail: row.studentEmail, studentName};
 }
 
@@ -130,7 +132,7 @@ export class PostgresLessonRepository implements LessonRepository {
         return null;
       }
 
-      const {markedLesson, results, notes, signOff} = decide(context);
+      const {markedLesson, results, notes, signOff, cancelReason} = decide(context);
 
       if (results) {
         const rows = Object.entries(results).map(([skillId, result]) => ({
@@ -147,7 +149,7 @@ export class PostgresLessonRepository implements LessonRepository {
         }
       }
 
-      if (!notes && !signOff) {
+      if (!notes && !signOff && cancelReason === undefined) {
         return context.lesson;
       }
 
@@ -155,6 +157,7 @@ export class PostgresLessonRepository implements LessonRepository {
         .update(bookings)
         .set({
           ...(notes && {studentNote: notes.student, privateNote: notes.private}),
+          ...(cancelReason !== undefined && {status: 'cancelled', cancelReason}),
           ...(signOff && {
             status: signOff.status,
             lessonNumber: signOff.lessonNumber,

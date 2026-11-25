@@ -1,10 +1,12 @@
-import type {Booking, Faction} from '@hde/shared';
+import type {Booking, Faction, TimeOff} from '@hde/shared';
 import type {Period} from '#src/bookings/lessonSlots.ts';
 import type {AvailabilityWindow} from '#src/db/availabilityData.ts';
 import type {Database} from '#src/db/client.ts';
 
-import {and, asc, eq, gt, ne, or} from 'drizzle-orm';
-import {allowedUsers, bookings, instructorAvailability} from '#src/db/schema.ts';
+import {and, asc, eq, gt, gte, lte, ne, or} from 'drizzle-orm';
+import {isExclusionViolation} from '#src/db/errors.ts';
+import {allowedUsers, bookings, instructorAvailability, instructors, instructorTimeOff} from '#src/db/schema.ts';
+import {schoolDate} from '#src/timeOff/schoolDays.ts';
 
 export interface BookingParties {
   studentEmail: string;
@@ -17,19 +19,19 @@ export type NewBooking = BookingParties & Period & {faction: Faction};
 export interface BookingRepository {
   listForStudent(email: string): Promise<Booking[]>;
   listAvailability(instructorSlug: string): Promise<AvailabilityWindow[]>;
+  /** The instructor's time off that ends on or after a date. */
+  listTimeOff(instructorSlug: string, from: string): Promise<Omit<TimeOff, 'id'>[]>;
   /** The lessons, ending after `from`, that keep the student, instructor or vehicle busy. */
   listBusy(parties: BookingParties, from: Date): Promise<Period[]>;
   /**
    * Books a lesson if `check`, given the student's bookings, does not throw. A student's bookings are made one
-   * at a time, so two requests cannot both pass it. Null if the time clashes with another lesson.
+   * at a time, so two requests cannot both pass it. Null if the time clashes with another lesson or
+   * the instructor's time off.
    */
   create(booking: NewBooking, check: (existing: Booking[]) => void): Promise<Booking | null>;
   /** Cancels the student's own lesson if `check` does not throw. Null if they have no such lesson. */
   cancel(email: string, id: string, check: (booking: Booking) => void): Promise<Booking | null>;
 }
-
-/** Postgres's code for a violated exclusion constraint. */
-const EXCLUSION_VIOLATION = '23P01';
 
 export type BookingRow = typeof bookings.$inferSelect;
 
@@ -41,6 +43,7 @@ export function toBooking({
   endsAt,
   status,
   lessonNumber,
+  cancelReason,
 }: BookingRow): Booking {
   return {
     id,
@@ -50,13 +53,8 @@ export function toBooking({
     endsAt: endsAt.toISOString(),
     status,
     lessonNumber,
+    cancelReason,
   };
-}
-
-function isClash(error: unknown): boolean {
-  const {cause} = error as {cause?: {code?: string}};
-
-  return cause?.code === EXCLUSION_VIOLATION;
 }
 
 export class PostgresBookingRepository implements BookingRepository {
@@ -77,6 +75,15 @@ export class PostgresBookingRepository implements BookingRepository {
       .select({weekday, startsAt, endsAt})
       .from(instructorAvailability)
       .where(eq(instructorAvailability.instructorSlug, instructorSlug));
+  }
+
+  async listTimeOff(instructorSlug: string, from: string): Promise<Omit<TimeOff, 'id'>[]> {
+    const {startsOn, endsOn} = instructorTimeOff;
+
+    return this.db
+      .select({startsOn, endsOn})
+      .from(instructorTimeOff)
+      .where(and(eq(instructorTimeOff.instructorSlug, instructorSlug), gte(endsOn, from)));
   }
 
   async listBusy({studentEmail, instructorSlug, vehicleSlug}: BookingParties, from: Date): Promise<Period[]> {
@@ -102,12 +109,30 @@ export class PostgresBookingRepository implements BookingRepository {
         // Holds the student's row until the end, so their bookings cannot change after the check.
         await tx.select().from(allowedUsers).where(eq(allowedUsers.email, booking.studentEmail)).for('update');
         check(await this.studentBookings(tx, booking.studentEmail));
+
+        // Shared with other bookings, but not with adding time off, which locks the instructor for itself.
+        await tx.select().from(instructors).where(eq(instructors.slug, booking.instructorSlug)).for('share');
+        const away = await tx
+          .select()
+          .from(instructorTimeOff)
+          .where(
+            and(
+              eq(instructorTimeOff.instructorSlug, booking.instructorSlug),
+              lte(instructorTimeOff.startsOn, schoolDate(booking.endsAt)),
+              gte(instructorTimeOff.endsOn, schoolDate(booking.startsAt)),
+            ),
+          );
+
+        if (away.length > 0) {
+          return null;
+        }
+
         const [row] = await tx.insert(bookings).values(booking).returning();
 
         return row ? toBooking(row) : null;
       });
     } catch (error) {
-      if (isClash(error)) {
+      if (isExclusionViolation(error)) {
         return null;
       }
 

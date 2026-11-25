@@ -109,6 +109,28 @@ export class LessonService {
     }
   }
 
+  /**
+   * Cancels a lesson on its instructor's behalf, any time until it is signed off. Its marks are discarded, and its
+   * notes are kept.
+   */
+  async cancel(id: string, reason: string, student: string | null): Promise<AdminLesson> {
+    const lesson = await this.lessons.update(id, (context) => {
+      checkStudent(context, student);
+
+      if (context.lesson.status !== 'booked') {
+        throw conflict('This lesson is already signed off or cancelled.');
+      }
+
+      return {markedLesson: 0, results: {}, notes: null, signOff: null, cancelReason: reason};
+    });
+
+    if (!lesson) {
+      throw lessonNotFound();
+    }
+
+    return lesson;
+  }
+
   async signOff(id: string, signOff: LessonSignOff, by: string, student: string | null): Promise<AdminLesson> {
     const [vehicles, curriculum] = await Promise.all([this.catalog.listVehicles(), this.catalog.listCurriculum()]);
     const lesson = await this.lessons.update(id, (context) => {

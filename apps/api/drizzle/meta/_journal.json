@@ -50,6 +50,20 @@
       "when": 1795571973108,
       "tag": "0006_lesson_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795573935010,
+      "tag": "0007_time_off",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795573935372,
+      "tag": "0008_time_off_exclusion",
+      "breakpoints": true
     }
   ]
 }
