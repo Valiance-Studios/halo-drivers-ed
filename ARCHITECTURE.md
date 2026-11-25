@@ -572,8 +572,9 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - `npm run db:clear`, to delete everyone's, a student's or an instructor's data.
 - [Rescheduling](#booking) a lesson. Deployed and tried on the site on 2026-11-24.
 - [Certificates](#certificates) for completed courses, and a Ghost lesson in guests' history. Deployed on 2026-11-24.
-- A lesson can no longer be cancelled and signed off at the same time, and API responses are not cached. Not deployed yet.
-- A menu for the app bar on narrow screens, and a footer notice. Not deployed yet.
+- A lesson can no longer be cancelled and signed off at the same time, and API responses are not cached. Deployed on 2026-11-24.
+- A menu for the app bar on narrow screens, and a footer notice. Deployed on 2026-11-24.
+- Public since 2026-11-24, under the MIT License. Before that, the history, pull requests and files were searched for secrets, and the backend and its GCP settings reviewed for an attacker who has the code ([Known Limits](#known-limits)). On GitHub: a ruleset on `main` (pull requests and both CI jobs required, no bypass), secret scanning with push protection, Dependabot alerts and security updates, CodeQL, approval for outside contributors' CI runs, and private vulnerability reporting. Secret scanning reports the Firebase web API key, which is public by design and restricted.
 - A `student` role, which can book but not sign off.
 - [Demo](#demo) slots for recruiters: 10 at once, 2 hours each. Deployed and tried on the site on 2026-11-24, including that signing out removes the anonymous account.
 - UNSC and Covenant themes, each light and dark, with placeholder artwork.
@@ -589,8 +590,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### Next: Decisions (need the owner)
 
-1. PrimeVue 5 (see [Dependency Decisions](docs/DEVELOPMENT.md#dependency-decisions)).
-2. The repository's visibility (private for now). Its history, pull requests and files were reviewed on 2026-11-24 and hold no secrets, and the backend and its GCP settings were reviewed for an attacker who has the code ([Known Limits](#known-limits)). The code is under the MIT License. Once public, turn on secret scanning with push protection, branch protection for `main`, and approval for outside contributors' CI runs.
+- PrimeVue 5 (see [Dependency Decisions](docs/DEVELOPMENT.md#dependency-decisions)).
 
 ### Next: Features
 
