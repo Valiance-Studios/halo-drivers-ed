@@ -16,7 +16,18 @@
       <p class="vehicle-detail__description">
         {{ vehicle.description }}
       </p>
+      <p
+        v-if="completed"
+        class="vehicle-detail__completed"
+      >
+        <span class="vehicle-detail__status">
+          <RibbonIcon />
+          Course Completed
+        </span>
+        <RouterLink :to="{name: 'certificate', params: {vehicleSlug: vehicle.slug}}">View Certificate</RouterLink>
+      </p>
       <Button
+        v-else
         class="vehicle-detail__book"
         :label="bookLabel"
         :icon="isLocked ? 'pi pi-lock' : 'pi pi-calendar'"
@@ -69,16 +80,19 @@ import type {Instructor, Vehicle} from '@hde/shared';
 
 import {defineComponent} from 'vue';
 import {progressText, totalHours} from '@/utils/vehicleText';
+import RibbonIcon from '@/components/RibbonIcon.vue';
 import SubjectArt from '@/components/SubjectArt.vue';
 
 /** One vehicle's course: what it covers, how long it takes, who teaches it, and booking it. */
 export default defineComponent({
   name: 'VehicleDetail',
-  components: {SubjectArt},
+  components: {RibbonIcon, SubjectArt},
   props: {
     vehicle: {type: Object as PropType<Vehicle>, required: true},
     prerequisiteNames: {type: Array as PropType<string[]>, required: true},
     instructors: {type: Array as PropType<Instructor[]>, required: true},
+    /** Whether every lesson of the course is completed. */
+    completed: {type: Boolean, required: true},
     /** The courses still to complete before this one can be booked. */
     missingNames: {type: Array as PropType<string[]>, required: true},
     /** How many more of the course's lessons can be booked. */
@@ -109,6 +123,10 @@ export default defineComponent({
     },
     /** Why the course cannot be booked, or nothing if it can. */
     reason(): string {
+      if (this.completed) {
+        return '';
+      }
+
       if (this.isLocked) {
         return `Complete ${this.missingNames.join(' and ')} first.`;
       }
@@ -179,6 +197,26 @@ export default defineComponent({
       opacity: 1;
       pointer-events: auto;
     }
+  }
+
+  &__completed {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    align-items: center;
+    margin: 1.125rem 0 0;
+
+    a {
+      color: var(--app-primary);
+    }
+  }
+
+  &__status {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    color: var(--app-accent-text);
+    font-weight: 700;
   }
 
   &__reason {

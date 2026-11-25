@@ -27,6 +27,7 @@ const lesson = (vehicleSlug: string, status: BookingStatus, lessonNumber: number
   status,
   lessonNumber,
   cancelReason: null,
+  signedOffAt: null,
 });
 const FIRST = vehicle('first');
 const SECOND = vehicle('second', 'first');
@@ -78,6 +79,30 @@ describe('progress store', () => {
 
     useBookingsStore().bookings = [lesson('first', 'repeat', 1), lesson('first', 'completed', 1)];
     expect(store.repeatDue(FIRST)).toBeNull();
+  });
+
+  it('says how a course was completed, by its final lesson', () => {
+    const store = useProgressStore();
+    const final = {...lesson('first', 'completed', 2), instructorSlug: 'rtas-vadum'};
+    useBookingsStore().bookings = [lesson('first', 'completed', 1), lesson('first', 'repeat', 2)];
+    expect(store.completion(FIRST)).toBeNull();
+
+    useBookingsStore().bookings = [final, lesson('first', 'completed', 1)];
+    expect(store.completion(FIRST)).toEqual({instructorSlug: 'rtas-vadum', completedAt: '2026-06-08T13:00:00.000Z'});
+    expect(store.completion(SECOND)).toBeNull();
+
+    // Corrected later, then signed off before it was even due.
+    useBookingsStore().bookings = [
+      {...final, signedOffAt: '2026-06-20T00:00:00.000Z'},
+      lesson('first', 'completed', 1),
+    ];
+    expect(store.completion(FIRST)?.completedAt).toBe('2026-06-08T13:00:00.000Z');
+
+    useBookingsStore().bookings = [
+      {...final, signedOffAt: '2026-06-01T00:00:00.000Z'},
+      lesson('first', 'completed', 1),
+    ];
+    expect(store.completion(FIRST)?.completedAt).toBe('2026-06-01T00:00:00.000Z');
   });
 
   it('counts booked and completed lessons, but not cancelled, missed or repeated ones', () => {

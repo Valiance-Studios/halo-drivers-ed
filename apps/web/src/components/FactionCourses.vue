@@ -13,6 +13,7 @@
       :vehicle="vehicle"
       :prerequisite-names="vehicle.prerequisites.map(catalogStore.vehicleName)"
       :instructors="catalogStore.instructorsFor(vehicle.slug)"
+      :completed="progressStore.completedSlugs.includes(vehicle.slug)"
       :missing-names="progressStore.missingFor(vehicle).map(catalogStore.vehicleName)"
       :lessons-left="progressStore.lessonsLeft(vehicle)"
       :lessons-completed="progressStore.lessonsCompleted(vehicle)"

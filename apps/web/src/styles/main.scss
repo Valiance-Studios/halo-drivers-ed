@@ -27,6 +27,18 @@ body {
   line-height: 1.5;
 }
 
+// Certificates print on one landscape page.
+@page certificate {
+  size: landscape;
+  margin: 1cm;
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+}
+
 h1,
 h2,
 h3 {

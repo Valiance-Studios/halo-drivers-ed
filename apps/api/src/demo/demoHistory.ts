@@ -1,18 +1,16 @@
 import type {LessonNotes} from '@hde/shared';
 import type {Period} from '#src/bookings/lessonSlots.ts';
-import type {AvailabilityWindow} from '#src/db/availabilityData.ts';
+import type {InstructorAvailability} from '#src/db/availabilityData.ts';
 
 import {findSlots} from '#src/bookings/lessonSlots.ts';
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
-/** Between the starts of a guest's past lessons, which leaves room for two on a weekday. */
+/** Between the starts of a guest's past lessons with an instructor, which leaves room for two on a weekday. */
 const SPACING_MS = 3 * HOUR_MS;
 
-/** Guests' past lessons are all with this instructor, who teaches both courses. */
-export const DEMO_INSTRUCTOR = 'master-chief';
-
 export interface DemoLesson {
+  instructorSlug: string;
   vehicleSlug: string;
   lessonNumber: number;
   status: 'completed' | 'repeat';
@@ -20,15 +18,18 @@ export interface DemoLesson {
 }
 
 /**
- * The Mongoose course, and the Warthog's four lessons, the last of which has to be repeated. Completing it unlocks the Scorpion and the Hornet.
+ * The Mongoose course, and the Warthog's four lessons, the last of which has to be repeated: completing it unlocks
+ * the Scorpion and the Hornet. Also the first of the Ghost's two: completing the other unlocks the Banshee and the
+ * Wraith.
  */
 export const DEMO_LESSONS: DemoLesson[] = [
-  {vehicleSlug: 'mongoose', lessonNumber: 1, status: 'completed'},
-  {vehicleSlug: 'mongoose', lessonNumber: 2, status: 'completed'},
-  {vehicleSlug: 'warthog', lessonNumber: 1, status: 'completed'},
-  {vehicleSlug: 'warthog', lessonNumber: 2, status: 'completed'},
-  {vehicleSlug: 'warthog', lessonNumber: 3, status: 'completed'},
+  {instructorSlug: 'master-chief', vehicleSlug: 'mongoose', lessonNumber: 1, status: 'completed'},
+  {instructorSlug: 'master-chief', vehicleSlug: 'mongoose', lessonNumber: 2, status: 'completed'},
+  {instructorSlug: 'master-chief', vehicleSlug: 'warthog', lessonNumber: 1, status: 'completed'},
+  {instructorSlug: 'master-chief', vehicleSlug: 'warthog', lessonNumber: 2, status: 'completed'},
+  {instructorSlug: 'master-chief', vehicleSlug: 'warthog', lessonNumber: 3, status: 'completed'},
   {
+    instructorSlug: 'master-chief',
     vehicleSlug: 'warthog',
     lessonNumber: 4,
     status: 'repeat',
@@ -37,6 +38,7 @@ export const DEMO_LESSONS: DemoLesson[] = [
       private: 'Ready to finish the course. Rushes the shutdown, so leave time for it.',
     },
   },
+  {instructorSlug: 'arbiter', vehicleSlug: 'ghost', lessonNumber: 1, status: 'completed'},
 ];
 
 /** When a slot's guest had their past lessons: each slot has its own week, so guests never clash. */
@@ -48,25 +50,40 @@ export function historyPeriod(slot: number, now: Date): {from: Date; until: Date
   };
 }
 
-/** A time in the instructor's hours for each lesson, in order. Fewer if there is no room. */
+/** A lesson to find a time for. */
+export interface HistoryLesson {
+  instructorSlug: string;
+  lessonMinutes: number;
+}
+
+/**
+ * A time for each lesson, in its instructor's hours and clear of the others. Each instructor's are in order. Fewer if
+ * there is no room.
+ */
 export function findHistoryTimes(
-  lessonMinutes: number[],
+  lessons: HistoryLesson[],
   period: {from: Date; until: Date},
-  windows: AvailabilityWindow[],
+  availability: InstructorAvailability[],
   busy: Period[],
 ): Period[] {
   const times: Period[] = [];
-  let {from} = period;
+  const nextFrom = new Map<string, Date>();
 
-  for (const minutes of lessonMinutes) {
-    const [time] = findSlots({windows, lessonMinutes: minutes, from, until: period.until, busy});
+  for (const {instructorSlug, lessonMinutes} of lessons) {
+    const [time] = findSlots({
+      windows: availability.filter((window) => window.instructorSlug === instructorSlug),
+      lessonMinutes,
+      from: nextFrom.get(instructorSlug) ?? period.from,
+      until: period.until,
+      busy: [...busy, ...times],
+    });
 
     if (!time) {
       break;
     }
 
     times.push(time);
-    from = new Date(time.startsAt.getTime() + SPACING_MS);
+    nextFrom.set(instructorSlug, new Date(time.startsAt.getTime() + SPACING_MS));
   }
 
   return times;

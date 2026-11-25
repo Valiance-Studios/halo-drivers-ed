@@ -16,6 +16,12 @@ const router = createRouter({
     {path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: {public: true}},
     {path: '/courses', name: 'courses', component: () => import('@/views/CoursesView.vue')},
     {path: '/lessons', name: 'lessons', component: () => import('@/views/LessonsView.vue')},
+    {
+      path: '/certificates/:vehicleSlug',
+      name: 'certificate',
+      component: () => import('@/views/CertificateView.vue'),
+      props: true,
+    },
     {path: '/schedule', name: 'schedule', component: () => import('@/views/ScheduleView.vue'), meta: {signOff: true}},
     {
       path: '/schedule/:id',

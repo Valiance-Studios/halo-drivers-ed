@@ -1,6 +1,7 @@
 /** Lesson times, in the viewer's own language and time zone. */
 
 const DAY = new Intl.DateTimeFormat(undefined, {weekday: 'long', month: 'long', day: 'numeric'});
+const LONG_DATE = new Intl.DateTimeFormat(undefined, {dateStyle: 'long'});
 const TIME = new Intl.DateTimeFormat(undefined, {hour: 'numeric', minute: '2-digit'});
 const TIME_WITH_ZONE = new Intl.DateTimeFormat(undefined, {
   hour: 'numeric',
@@ -10,6 +11,11 @@ const TIME_WITH_ZONE = new Intl.DateTimeFormat(undefined, {
 
 export function lessonDay(iso: string): string {
   return DAY.format(new Date(iso));
+}
+
+/** A whole date, e.g. "November 24, 2026". */
+export function longDate(iso: string): string {
+  return LONG_DATE.format(new Date(iso));
 }
 
 export function lessonTime(iso: string): string {

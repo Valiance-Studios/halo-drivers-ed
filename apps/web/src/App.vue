@@ -69,6 +69,7 @@
     <main class="app__main">
       <Message
         v-if="demoNotice"
+        class="app__notice"
         severity="info"
       >
         {{ demoNotice }}
@@ -228,10 +229,22 @@ export default defineComponent({
     }
   }
 
+  @media print {
+    &__header,
+    &__notice {
+      display: none;
+    }
+  }
+
   &__main {
     max-width: var(--app-max-width);
     margin: 0 auto;
     padding: var(--app-gutter) var(--app-gutter) 3rem;
+
+    @media print {
+      max-width: none;
+      padding: 0;
+    }
   }
 }
 </style>
