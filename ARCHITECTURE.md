@@ -334,6 +334,17 @@ One image holds both entry points. Migrations and the catalog seed run as their 
 
 Agreed, not built yet. Build these on their own branches.
 
+### Security Hardening
+
+From a code review (not a penetration test), in one pull request, before demo access opens. Wait for the owner's go-ahead to start it. In order:
+
+1. **Verified emails.** `createFirebaseTokenVerifier` trusts a token's `email` without checking `email_verified`. Google's are verified, but if email/password sign-in were ever enabled, someone could register an allowlisted address. Treat an unverified email as none. Check that the Auth emulator's Google accounts count as verified.
+2. **Security headers.** The site sends only HSTS. Add a Content Security Policy, `frame-ancestors`, `X-Content-Type-Options` and `Referrer-Policy` in `firebase.json`. Test the policy on the deployed site: sign-in (the `firebaseapp.com` popup), App Check and reCAPTCHA load Google scripts and frames, and the emulators do not use Hosting's headers.
+3. **Request size limit.** Hono's `bodyLimit` on `/api`; every body is small JSON.
+4. **Rate limiting** per account, on writes above all. Cloud Run runs up to 2 instances, so an in-memory limit is per instance.
+
+Already covered: parameterized queries (Drizzle; no stored procedures needed), ownership and admin checks with tests, App Check with ID tokens and the allowlist on every route except the health check, bearer tokens rather than cookies (no CSRF), an API database role that can only read and write rows, and database constraints and row locks against races. An ID token stays valid for up to an hour after sign-out, accepted because removing an account from the allowlist takes effect at once.
+
 ### Demo Slots for Recruiters
 
 Self-serve, no code to request:
@@ -343,6 +354,8 @@ Self-serve, no code to request:
 - Reusing an expired slot deletes its old guest's data in the same transaction: guest records reference the slot session with `ON DELETE CASCADE`.
 - Guests get a `guest` role: the seeded catalog, only their own bookings, and a booking cap. When every slot is taken, the page says when the next one frees up.
 - Lazy reclamation means no scheduled job is needed at first.
+- Give each guest some lessons already completed, so a course can be seen unlocking without waiting for a lesson to end.
+- To settle: guests signed in anonymously have no email, but `bookings.student_email` and the booking lock reference `allowed_users.email`, so guests need another identity.
 
 ## Diagram Index
 
@@ -379,6 +392,11 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - App Check: reCAPTCHA Enterprise registered for the web app, enforced for Authentication and required by the API; a debug token for `npm run dev:staging`, which proxies `/api` to the deployed API.
 - Credentials locked down: the Firebase web API key allows only the hosted domains and `localhost:5173`, and only the Identity Toolkit, Token Service and App Check APIs; each service account has only its listed roles.
 
+### To Check
+
+- The prompt when leaving a lesson form with unsaved marks has no test.
+- Accounts allowlisted before the `student` role existed are admins, who can sign off everyone's lessons. Change others with `npm run db:allow -- <email> student`.
+
 ### Next: Decisions (need the owner)
 
 1. PrimeVue 5 (see [Dependency Decisions](docs/DEVELOPMENT.md#dependency-decisions)).
@@ -386,5 +404,6 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### Next: Features
 
-1. Demo slots for recruiters, with some lessons already completed so a course can be seen unlocking.
-2. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. See [Artwork](docs/UI.md#artwork).
+1. [Security hardening](#security-hardening), before demo slots.
+2. [Demo slots for recruiters](#demo-slots-for-recruiters).
+3. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. Flat shapes drawn in code cannot get close. See [Artwork](docs/UI.md#artwork).
