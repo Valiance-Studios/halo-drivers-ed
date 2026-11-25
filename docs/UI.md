@@ -14,11 +14,11 @@ The vehicle and instructor pictures are **placeholders**, simple original drawin
 
 ## App Bar
 
-The app name (links to Courses), links to **Courses**, **My lessons** and (for admins and demo guests) **Schedule** when signed in, two circular toggles and, when signed in, the account's name and **Sign out**. One toggle switches between the UNSC and Covenant themes and shows the emblem of the theme it switches to; the other switches between light and dark. UNSC is the default, and light or dark follows the system setting until its toggle is used. Both choices are remembered in this browser (`localStorage`). During a demo, a notice below the bar says when it ends, and that it cannot be returned to after that or after signing out.
+The app name (links to Courses), links to **Courses**, **My lessons** and (for admins and demo guests) **Schedule** when signed in, two circular toggles and, when signed in, the account's name and **Sign out**. One toggle switches between the UNSC and Covenant themes and shows the emblem of the theme it switches to; the other switches between light and dark. UNSC is the default, and light or dark follows the system setting until its toggle is used. Both choices are remembered in this browser (`localStorage`). On narrow screens the links move to their own row, and the account's name is hidden. During a demo, a notice below the bar says when it ends, and that it cannot be returned to after that or after signing out.
 
 ## Login (`/login`)
 
-A heading, the theme's road and vehicle (Warthog or Ghost), and a card with **Sign in with Google** and **Try the demo**, which needs no account. If every demo place is taken, it says when the next one frees up. An account that is not on the allowlist is signed out again, with "This Google account is not authorized to use this app." Signed-out visitors to any other page land here, and return to that page after signing in.
+A heading, the theme's road and vehicle (Warthog or Ghost), and a card with **Sign in with Google** and **Try the demo**, which needs no account and says how long it lasts. If every demo place is taken, it says when the next one frees up. An account that is not on the allowlist is signed out again, with "This Google account is not authorized to use this app." Signed-out visitors to any other page land here, and return to that page after signing in.
 
 ## Courses (`/courses`)
 
@@ -29,7 +29,7 @@ Tabs for **UNSC** and **Covenant**, opening on the theme's faction. Each tab sho
 - **Lesson plan**: the selected course's lessons, each opening to the skills marked in it. Lessons the student has attended say how they went, with each skill's latest result, and the one to take next says **Next**.
 - **Instructors**: each instructor's picture, name, title and bio.
 
-The catalog loads once per visit; a failure shows an error message in place of the tabs.
+The catalog loads once per visit, and the student's lessons each time the page opens; a failure shows an error message in place of the tabs.
 
 ### Booking a Lesson
 
@@ -37,7 +37,7 @@ A dialog to choose an instructor, a day and a time in the next 14 days, in the v
 
 ## My Lessons (`/lessons`)
 
-**Upcoming** lessons, then **Past and cancelled** ones, with the vehicle, time, instructor and status. One cancelled by its instructor says so, with the reason. An upcoming lesson can be cancelled or rescheduled until 24 hours before it starts. **Reschedule** opens the booking dialog with the lesson's instructor chosen; it can be moved to another time, instructor or both, and keeps its old time until then. **See results** shows how each skill went in a lesson that was signed off as attended, and the instructor's note.
+**Upcoming** lessons, then **Past and cancelled** ones, with the vehicle, time, instructor and status. One cancelled by its instructor says so, with the reason. Until it is signed off, a lesson that is over says **Awaiting the instructor**. An upcoming lesson can be cancelled or rescheduled until 24 hours before it starts, and then says **Too late to change**. **Reschedule** opens the booking dialog with the lesson's instructor chosen; it can be moved to another time, instructor or both, and keeps its old time until then. **See results** shows how each skill went in a lesson that was signed off as attended, and the instructor's note.
 
 ## Certificate (`/certificates/:vehicleSlug`)
 

@@ -457,6 +457,16 @@ describe('API', () => {
     });
   });
 
+  it.each([
+    ['a success', '/api/bookings', SIGNED_IN, 200],
+    ['an error', '/api/bookings', {}, 401],
+  ])('keeps caches from storing %s', async (_, path, headers, status) => {
+    const response = await get(makeApp(), path, headers);
+
+    expect(response.status).toBe(status);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+  });
+
   it('answers unknown endpoints with a JSON 404', async () => {
     const response = await get(makeApp(), '/api/nope', SIGNED_IN);
 

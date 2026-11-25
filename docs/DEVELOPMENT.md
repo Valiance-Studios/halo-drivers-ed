@@ -9,12 +9,12 @@
 
 ## Running Locally
 
-Four processes, each in its own terminal (Postgres runs in the background):
+Postgres runs in the background; steps 3 to 5 each keep a terminal:
 
 | Step | Command | What it does |
 | --- | --- | --- |
 | 1 | `npm run db:up` | Starts Postgres 18 in Docker on port **5433** (not 5432, to avoid a local install). |
-| 2 | `npm run db:reset` | Wipes the local database, applies the migrations and seeds the catalog. Refuses non-local databases. |
+| 2 | `npm run db:reset` | Wipes the local database, applies the migrations, and seeds the catalog and demo slots. Refuses non-local databases. |
 | 3 | `npm run emulators` | Starts the Auth emulator (9099, UI on 4000) as `demo-halo-drivers-ed`, creates **cadet@example.com** and allowlists it as an admin. |
 | 4 | `npm run dev:api` | Runs the API from source on **8081**, restarting on changes (`node --watch`). |
 | 5 | `npm run dev` | Runs Vite on **5173**, proxying `/api` to the API. |
@@ -99,9 +99,9 @@ Before clearing the deployed database, see [Clearing Deployed Data](DEPLOYMENT.m
 
 ## Tests
 
-- **Unit**: `apps/web/tests/unit` (stores and the API client with mocks), `apps/api/tests/unit` (routes with fake token verifier and repositories, config rules, catalog data, request limits), `tests/scripts` (deploy checks, hosting headers).
-- **Database**: `apps/api/tests/db`. They prove the constraints hold in Postgres itself, such as rejecting an instructor who teaches another faction's vehicle.
-- **E2E**: `apps/web/e2e`. Sign-in through the emulator's account chooser, the allowlist, the demo, and the courses page against the real API and database.
+- **Unit**: `apps/web/tests/unit` (stores, the API client and utilities, with mocks), `apps/api/tests/unit` (routes with fake token verifier and repositories, lesson times, demo history, config rules, seed data, rate limits), `tests/scripts` (deploy checks, hosting headers).
+- **Database**: `apps/api/tests/db`. They prove the constraints hold in Postgres itself, such as rejecting an instructor who teaches another faction's vehicle, and that changes made at the same time (booking, rescheduling, time off, demo slots) cannot break the rules.
+- **E2E**: `apps/web/e2e`. Against the real API, database and Auth emulator: signing in and the allowlist, the courses page and themes, booking, rescheduling and cancelling, signing lessons off, certificates, time off, and the demo.
 
 ## CI
 
@@ -119,5 +119,5 @@ Before clearing the deployed database, see [Clearing Deployed Data](DEPLOYMENT.m
 - **`vue-tsc` stays the type checker**: Vite+'s own (`typeCheck`) does not check Vue components.
 - **esbuild stays the API's bundler**, so the API image does not install Vite+.
 - **Install scripts**: all denied in `allowScripts` (npm 12). None are needed: esbuild ships its binary as an optional platform package, and the rest (protobufjs, re2, fsevents, @firebase/util, @parcel/watcher) come from firebase-tools or are optional.
-- **`npm audit`**: production dependencies are clean (`npm audit --omit=dev`). The `@grpc/grpc-js` override lifts a vulnerable copy nested under the Firebase web SDK's Firestore package (unused here). The remaining moderate findings are in dev tooling.
+- **`npm audit`**: production dependencies are clean (`npm audit --omit=dev`). The `@grpc/grpc-js` override lifts a vulnerable copy nested under the Firebase web SDK's Firestore package (unused here). `npm audit` still lists moderate findings in dev tooling, which come with firebase-tools; `npm audit fix --force` would downgrade it, so leave them.
 - **firebase-tools on Node 26** prints an `EBADENGINE` warning for `superstatic` (supports Node 20, 22, 24); it works.

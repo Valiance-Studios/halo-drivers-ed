@@ -2,7 +2,7 @@
 
 Deploys run locally, not from CI. The pipeline as a diagram is under [Deployment](../ARCHITECTURE.md#deployment) in `ARCHITECTURE.md`.
 
-Everything lives in the GCP project **`vs-halo-drivers-ed-dev`** (number 427425852003), region **`us-central1`**, except the database, which is on Neon. The commands below pass `--project` explicitly, since the default `gcloud` project on this machine may be another one.
+Everything lives in the GCP project **`vs-halo-drivers-ed-dev`** (number 427425852003), region **`us-central1`**, except the database, which is on Neon. The commands below pass `--project` explicitly, since your default `gcloud` project may be another one.
 
 ## One-Time Setup
 
@@ -121,9 +121,11 @@ Deploy the API first: Hosting's `/api` rewrite needs the `hde-api` service to ex
 
 - **`npm run deploy:api`** (`scripts/deploy-api.ts`), from a clean working tree:
   1. Cloud Build builds `apps/api/Dockerfile` as `sa-hde-build-dev` and pushes `us-central1-docker.pkg.dev/vs-halo-drivers-ed-dev/hde/api:<commit>`.
-  2. Deploys and runs the `hde-migrate` job (`node dist/release.js`): migrations, then the catalog seed. A failure stops the deploy.
+  2. Deploys and runs the `hde-migrate` job (`node dist/release.js`): migrations, then the catalog and demo slots. A failure stops the deploy.
   3. Deploys the `hde-api` service with `DATABASE_URL` from Secret Manager, `APP_CHECK=required`, 0 to 2 instances.
 - **`npm run deploy:web`**: `hosting.predeploy` runs `scripts/check-firebase-config.ts staging` (refuses a missing site key, an emulator build or a debug token), builds with `--mode staging`, then deploys to https://vs-halo-drivers-ed-dev.web.app, with the [security headers](../ARCHITECTURE.md#security-headers) in `firebase.json`. After changing those, sign in on the deployed site and check the browser console: the emulators do not send them.
+
+After deploying, try the change on the site, then record the date under [Project Status](../ARCHITECTURE.md#project-status). Guests already in a demo keep the lessons theirs started with.
 
 ## Clearing Deployed Data
 

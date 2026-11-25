@@ -37,6 +37,25 @@ test('an instructor signs lessons off, which unlocks the next course for the stu
   await page.route('**/results/*', (route) => route.abort());
   await firstPass.click();
   await expect(page.getByText('Not saved', {exact: true})).toBeVisible();
+
+  // Leaving asks first, and stays if told to.
+  const leave = page.getByRole('link', {name: 'Back to the schedule'});
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toBe('Some changes are not saved. Leave and lose them?');
+    await dialog.dismiss();
+  });
+  await leave.click();
+  await expect(page).toHaveURL(/\/schedule\/.+/);
+  await expect(page.getByText('Not saved', {exact: true})).toBeVisible();
+
+  // Leaving anyway loses the mark.
+  page.once('dialog', (dialog) => dialog.accept());
+  await leave.click();
+  await page.getByRole('link', {name: 'Open form'}).first().click();
+  await expect(firstPass).toHaveAttribute('aria-pressed', 'false');
+
+  await firstPass.click();
+  await expect(page.getByText('Not saved', {exact: true})).toBeVisible();
   await page.unroute('**/results/*');
   await page.getByRole('button', {name: /^Retry saving/}).click();
   await expect(page.getByText('All changes saved.')).toBeVisible();

@@ -150,8 +150,7 @@ export class PostgresBookingRepository implements BookingRepository {
   ): Promise<Booking | null> {
     return this.withStudentLocked(email, async (tx) => {
       const own = and(eq(bookings.id, id), eq(bookings.studentEmail, email));
-      // Cancelling locks the lesson rather than the student.
-      const [row] = await tx.select().from(bookings).where(own).for('update');
+      const [row] = await tx.select().from(bookings).where(own);
       check(row ? toBooking(row) : null);
 
       if (await this.isAway(tx, {instructorSlug, startsAt, endsAt})) {
@@ -165,9 +164,9 @@ export class PostgresBookingRepository implements BookingRepository {
   }
 
   async cancel(email: string, id: string, check: (booking: Booking) => void): Promise<Booking | null> {
-    return this.db.transaction(async (tx) => {
+    return this.withStudentLocked(email, async (tx) => {
       const own = and(eq(bookings.id, id), eq(bookings.studentEmail, email));
-      const [row] = await tx.select().from(bookings).where(own).for('update');
+      const [row] = await tx.select().from(bookings).where(own);
 
       if (!row) {
         return null;
