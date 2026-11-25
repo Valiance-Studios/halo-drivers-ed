@@ -395,7 +395,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - Monorepo scaffold: web (Vue 3 Options API, PrimeVue 4, Pinia, Router), API (Hono, Drizzle), shared types; Vite+ (Vite, Vitest, Oxlint, Oxfmt), ESLint for Vue components, Playwright, CI.
 - Google sign-in with the allowlist held by the API (`GET /api/me`), and a route guard.
 - API with App Check and ID token checks, JSON errors, and a config that refuses unsafe settings on Cloud Run.
-- Security hardening: verified emails only, request size and per-account rate limits, and [security headers](#security-headers).
+- Security hardening: verified emails only, request size and per-account rate limits, and [security headers](#security-headers). Deployed on 2026-11-24 and checked on the site: no policy violations in the console, and no policy on `/__/auth/`.
 - Postgres schema and first migration: vehicles, prerequisites, instructors, who teaches what, allowlist. Seeded catalog of 10 vehicles and 6 instructors.
 - Courses page: vehicles on a route map of their prerequisites, and instructors, by faction.
 - Locks on courses whose prerequisites are not complete, enforced by the API.
@@ -411,7 +411,6 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### To Check
 
-- The security hardening is not deployed. Deploy the API and the site, then check on the site that sign-in, App Check and every page work with no policy violations in the browser console, and that `/__/auth/iframe` has no policy.
 - The prompt when leaving a lesson form with unsaved marks has no test.
 - Accounts allowlisted before the `student` role existed are admins, who can sign off everyone's lessons. Change others with `npm run db:allow -- <email> student`.
 
