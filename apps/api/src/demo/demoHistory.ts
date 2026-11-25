@@ -1,3 +1,4 @@
+import type {LessonNotes} from '@hde/shared';
 import type {Period} from '#src/bookings/lessonSlots.ts';
 import type {AvailabilityWindow} from '#src/db/availabilityData.ts';
 
@@ -15,6 +16,7 @@ export interface DemoLesson {
   vehicleSlug: string;
   lessonNumber: number;
   status: 'completed' | 'repeat';
+  notes?: LessonNotes;
 }
 
 /**
@@ -26,7 +28,15 @@ export const DEMO_LESSONS: DemoLesson[] = [
   {vehicleSlug: 'mongoose', lessonNumber: 2, status: 'completed'},
   {vehicleSlug: 'warthog', lessonNumber: 1, status: 'completed'},
   {vehicleSlug: 'warthog', lessonNumber: 2, status: 'completed'},
-  {vehicleSlug: 'warthog', lessonNumber: 3, status: 'repeat'},
+  {
+    vehicleSlug: 'warthog',
+    lessonNumber: 3,
+    status: 'repeat',
+    notes: {
+      student: 'Smooth driving and a steady line for your gunner. Next time, call out turns and bumps sooner.',
+      private: 'Confident at speed, but goes quiet under pressure. Ask for callouts throughout.',
+    },
+  },
   {vehicleSlug: 'warthog', lessonNumber: 3, status: 'completed'},
 ];
 

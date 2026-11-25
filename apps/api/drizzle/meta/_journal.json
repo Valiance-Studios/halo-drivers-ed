@@ -43,6 +43,13 @@
       "when": 1795566562819,
       "tag": "0005_demo_slots",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795571973108,
+      "tag": "0006_lesson_notes",
+      "breakpoints": true
     }
   ]
 }

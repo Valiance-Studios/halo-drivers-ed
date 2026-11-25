@@ -191,7 +191,12 @@ describe('guests', () => {
     expect(lesson.number).toBe(4);
 
     const results = Object.fromEntries(lesson.skills.map((skill) => [skill.id, 'pass' as const]));
-    await lessonService.signOff(id, {results, attendance: 'attended', early: true}, email, email);
+    await lessonService.signOff(
+      id,
+      {results, notes: {student: '', private: ''}, attendance: 'attended', early: true},
+      email,
+      email,
+    );
     expect(await book('scorpion')).toMatchObject({status: 'booked'});
     expect(await book('hornet')).toMatchObject({status: 'booked'});
   });

@@ -46,8 +46,17 @@ test('an instructor signs lessons off, which unlocks the next course for the stu
   await firstPass.click();
   await expect(page.getByText('All changes saved.')).toBeVisible();
 
+  // Notes save once typing pauses.
+  await page.getByLabel('Note for the student').fill('Great start.');
+  await page.getByLabel('Private note').fill('Ready for more.');
+  await expect(page.getByText('All changes saved.')).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel('Private note')).toHaveValue('Ready for more.');
+
   await passNextLesson(page);
   await passNextLesson(page);
+  await page.locator('summary', {hasText: 'Lesson 1: Startup and controls'}).click();
+  await expect(page.getByText('Ready for more.')).toBeVisible();
   await page.getByRole('button', {name: 'Sign out'}).click();
 
   await signInWithGoogle(page, STUDENT_USER);
@@ -55,12 +64,18 @@ test('an instructor signs lessons off, which unlocks the next course for the stu
   await expect(page.getByRole('button', {name: /^Mongoose.*2\/2 lessons completed/})).toBeVisible();
   await expect(page.locator('.vehicle-detail').getByText('2/2', {exact: true})).toBeVisible();
   await expect(page.getByText(/lessons completed/)).toHaveCount(1);
+  await page.locator('summary', {hasText: 'Lesson 1: Startup and controls Completed'}).click();
+  await expect(
+    page.getByRole('listitem').filter({hasText: 'Engage and release the parking brake: Passed'}),
+  ).toBeVisible();
   await page.getByRole('button', {name: /^Warthog/}).click();
   await expect(page.getByRole('button', {name: 'Book Warthog lesson'})).toBeEnabled();
 
   await page.getByRole('link', {name: 'My lessons'}).click();
-  await page.getByRole('button', {name: 'See results'}).first().click();
+  await page.getByRole('button', {name: 'See results'}).last().click();
   await expect(page.getByRole('dialog').getByText('Passed')).toHaveCount(5);
+  await expect(page.getByRole('dialog').getByText('Great start.')).toBeVisible();
+  await expect(page.getByText('Ready for more.')).toHaveCount(0);
 });
 
 test("shows a course's lesson plan, and keeps students out of the schedule", async ({page}) => {

@@ -1,4 +1,4 @@
-import type {Vehicle} from '@hde/shared';
+import type {AttendedLesson, Vehicle} from '@hde/shared';
 
 import {defineStore} from 'pinia';
 import {
@@ -30,6 +30,18 @@ export const useProgressStore = defineStore('progress', {
     /** The lesson to repeat before going on, if any. */
     repeatDue(): (vehicle: Vehicle) => number | null {
       return (vehicle) => repeatDue(vehicle, useBookingsStore().bookings);
+    },
+    /** The student's results in a course, soonest first. */
+    resultsIn(): (vehicle: Vehicle) => AttendedLesson[] {
+      return ({slug}) => useBookingsStore().results.filter(({vehicleSlug}) => vehicleSlug === slug);
+    },
+    /** The lesson of a started course the student takes next; null once it is completed. */
+    nextLesson(): (vehicle: Vehicle) => number | null {
+      return (vehicle) => {
+        const completed = this.lessonsCompleted(vehicle);
+
+        return completed === null || completed >= vehicle.lessonsRequired ? null : completed + 1;
+      };
     },
     hasLessonBooked(): (vehicle: Vehicle) => boolean {
       return (vehicle) => hasLessonBooked(vehicle, useBookingsStore().bookings);
