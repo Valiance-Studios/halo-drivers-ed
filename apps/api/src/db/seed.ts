@@ -3,8 +3,10 @@ import type {InstructorAvailability} from '#src/db/availabilityData.ts';
 import type {Database} from '#src/db/client.ts';
 
 import {sql} from 'drizzle-orm';
+import {DEMO_SLOTS} from '@hde/shared';
 import {
   courseLessons,
+  demoSlots,
   instructorAvailability,
   instructors,
   instructorVehicles,
@@ -18,6 +20,12 @@ import {INSTRUCTORS, VEHICLES} from '#src/db/catalogData.ts';
 
 /** Takes the excluded (incoming) value of a column in an upsert. */
 const excluded = (column: string) => sql.raw(`excluded.${column}`);
+
+/** Adds the demo's slots that are not there yet. Safe to repeat, and leaves sessions alone. */
+export async function seedDemoSlots(db: Database): Promise<void> {
+  const rows = Array.from({length: DEMO_SLOTS}, (_, index) => ({id: index + 1}));
+  await db.insert(demoSlots).values(rows).onConflictDoNothing();
+}
 
 /**
  * Loads the course catalog, updating what is already there, in one transaction. Safe to repeat. Vehicles

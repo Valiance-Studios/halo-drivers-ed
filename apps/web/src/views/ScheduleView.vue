@@ -16,6 +16,16 @@
       aria-label="Loading the schedule"
     />
     <template v-else>
+      <label
+        v-if="hasGuests"
+        class="schedule__guests"
+      >
+        <input
+          v-model="showGuests"
+          type="checkbox"
+        />
+        Show demo guests
+      </label>
       <template
         v-for="group in groups"
         :key="group.title"
@@ -49,6 +59,7 @@ import type {AdminLesson, Booking} from '@hde/shared';
 
 import {defineComponent} from 'vue';
 import {mapStores} from 'pinia';
+import {isGuestEmail} from '@hde/shared';
 import {api} from '@/services/api';
 import {useCatalogStore} from '@/stores/catalog';
 import {useViewAsStore} from '@/stores/viewAs';
@@ -66,12 +77,18 @@ export default defineComponent({
   name: 'ScheduleView',
   components: {LessonList, ViewAsSelect},
   data() {
-    return {lessons: [] as AdminLesson[], loading: true, errorMessage: '', now: new Date()};
+    return {lessons: [] as AdminLesson[], loading: true, errorMessage: '', now: new Date(), showGuests: false};
   },
   computed: {
     ...mapStores(useCatalogStore, useViewAsStore),
+    hasGuests(): boolean {
+      return this.lessons.some(({studentEmail}) => isGuestEmail(studentEmail));
+    },
+    shownLessons(): AdminLesson[] {
+      return this.showGuests ? this.lessons : this.lessons.filter(({studentEmail}) => !isGuestEmail(studentEmail));
+    },
     groups(): LessonGroup[] {
-      const booked = this.lessons.filter(({status}) => status === 'booked');
+      const booked = this.shownLessons.filter(({status}) => status === 'booked');
 
       return [
         {title: 'To sign off', lessons: booked.filter(this.isWaiting), empty: 'Nothing is waiting to be signed off.'},
@@ -82,7 +99,7 @@ export default defineComponent({
         },
         {
           title: 'Signed off',
-          lessons: this.lessons.filter(({status}) => status !== 'booked').reverse(),
+          lessons: this.shownLessons.filter(({status}) => status !== 'booked').reverse(),
           empty: 'No lessons have been signed off.',
         },
       ];
@@ -146,6 +163,13 @@ export default defineComponent({
   &__subheading {
     margin: 1.75rem 0 1rem;
     font-size: 1.6875rem;
+  }
+
+  &__guests {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-top: 1rem;
   }
 
   &__spinner {

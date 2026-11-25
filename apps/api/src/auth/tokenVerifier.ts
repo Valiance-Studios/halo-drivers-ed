@@ -6,8 +6,10 @@ import {getAuth} from 'firebase-admin/auth';
 
 export interface VerifiedUser {
   uid: string;
-  /** Null for accounts without a verified one, such as the anonymous demo guests to come. */
+  /** Null for accounts without a verified one, such as anonymous ones. */
   email: string | null;
+  /** Whether this is an anonymous account, as demo visitors use. */
+  isAnonymous: boolean;
   /** The account's name, if it has one. */
   displayName: string | null;
 }
@@ -23,13 +25,20 @@ export interface TokenVerifier {
 const MAX_NAME_LENGTH = 100;
 
 /** What the app uses of a valid ID token. */
-export function toVerifiedUser({uid, email, email_verified: emailVerified, name}: DecodedIdToken): VerifiedUser {
+export function toVerifiedUser(token: DecodedIdToken): VerifiedUser {
+  const {uid, email, email_verified: emailVerified, name, firebase} = token;
+
   // The name comes from the account's owner, so its type and length are not taken on trust.
   const ownName: unknown = name;
   const displayName = typeof ownName === 'string' ? ownName.trim().slice(0, MAX_NAME_LENGTH) || null : null;
 
   // Anyone could register an allowlisted address, so one whose owner has not proved it counts as none.
-  return {uid, email: emailVerified === true ? (email ?? null) : null, displayName};
+  return {
+    uid,
+    email: emailVerified === true ? (email ?? null) : null,
+    isAnonymous: firebase.sign_in_provider === 'anonymous',
+    displayName,
+  };
 }
 
 /**

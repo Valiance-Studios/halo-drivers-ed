@@ -104,7 +104,7 @@ The API always requires App Check on Cloud Run (`APP_CHECK=required`; it refuses
 
 ### 5. Firebase Authentication
 
-Firebase console → Authentication → Sign-in method → enable **Google**. `vs-halo-drivers-ed-dev.web.app` and `.firebaseapp.com` are authorized domains by default.
+Firebase console → Authentication → Sign-in method → enable **Google**, and **Anonymous** for the [demo](../ARCHITECTURE.md#demo). Anonymous accounts get nothing without a demo session, which the API grants. `vs-halo-drivers-ed-dev.web.app` and `.firebaseapp.com` are authorized domains by default.
 
 ### 6. Allowlist Yourself
 

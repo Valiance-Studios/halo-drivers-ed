@@ -50,7 +50,7 @@ Conventions are in [CLAUDE.md](../CLAUDE.md#environment-files). In short:
 | `npm run test:db` | The API's database tests, in their own `halo_drivers_ed_test` database (recreated each run). Needs `npm run db:up`. |
 | `npm run test:e2e` | Playwright. Starts its own Auth emulator, API (port 8082, `halo_drivers_ed_e2e` database, recreated each run) and Vite (5174). Needs `npm run db:up`. |
 | `npm run db:generate` | Writes a migration for changes to `apps/api/src/db/schema.ts`. |
-| `npm run db:migrate` / `db:seed` | Applies migrations / loads the catalog, on `DATABASE_URL` (local by default). |
+| `npm run db:migrate` / `db:seed` | Applies migrations / loads the catalog and demo slots, on `DATABASE_URL` (local by default). |
 | `npm run db:allow -- <email> [role]` | Allowlists an account as `admin` (the default) or `student`, or changes its role. Give students `student`: admins see and sign off everyone's lessons. |
 | `npm run deploy:api` / `deploy:web` | See [DEPLOYMENT.md](DEPLOYMENT.md). |
 
@@ -58,7 +58,7 @@ Conventions are in [CLAUDE.md](../CLAUDE.md#environment-files). In short:
 
 - **Unit**: `apps/web/tests/unit` (stores and the API client with mocks), `apps/api/tests/unit` (routes with fake token verifier and repositories, config rules, catalog data, request limits), `tests/scripts` (deploy checks, hosting headers).
 - **Database**: `apps/api/tests/db`. They prove the constraints hold in Postgres itself, such as rejecting an instructor who teaches another faction's vehicle.
-- **E2E**: `apps/web/e2e`. Sign-in through the emulator's account chooser, the allowlist, and the courses page against the real API and database.
+- **E2E**: `apps/web/e2e`. Sign-in through the emulator's account chooser, the allowlist, the demo, and the courses page against the real API and database.
 
 ## CI
 

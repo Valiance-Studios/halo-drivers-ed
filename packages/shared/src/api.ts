@@ -12,6 +12,8 @@ export const API_ERROR_CODES = [
   'app-check-failed',
   'not-allowed',
   'not-admin',
+  'demo-ended',
+  'demo-limit',
   'not-found',
   'invalid-request',
   'request-too-large',

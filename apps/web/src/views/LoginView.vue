@@ -41,8 +41,21 @@
           label="Sign in with Google"
           icon="pi pi-google"
           :loading="signingIn"
+          :disabled="startingDemo"
           @click="signIn"
         />
+        <Button
+          class="login__button"
+          label="Try the demo"
+          severity="secondary"
+          outlined
+          :loading="startingDemo"
+          :disabled="signingIn"
+          @click="startDemo"
+        />
+        <p class="login__note">
+          No account needed. The demo lasts {{ demoHours }} hours, and you cannot return to it after that.
+        </p>
       </template>
     </Card>
   </section>
@@ -53,6 +66,7 @@ import type {Faction} from '@hde/shared';
 
 import {defineComponent} from 'vue';
 import {mapStores} from 'pinia';
+import {DEMO_SESSION_MINUTES} from '@hde/shared';
 import {useAuthStore} from '@/stores/auth';
 import {useThemeStore} from '@/stores/theme';
 import SubjectArt from '@/components/SubjectArt.vue';
@@ -72,6 +86,8 @@ export default defineComponent({
   data() {
     return {
       signingIn: false,
+      startingDemo: false,
+      demoHours: DEMO_SESSION_MINUTES / 60,
     };
   },
   computed: {
@@ -93,6 +109,21 @@ export default defineComponent({
         this.signingIn = false;
       }
 
+      await this.enter();
+    },
+    async startDemo() {
+      this.startingDemo = true;
+
+      try {
+        await this.authStore.startDemo();
+      } finally {
+        this.startingDemo = false;
+      }
+
+      await this.enter();
+    },
+    /** Goes on to the page the visitor came for, if they are signed in. */
+    async enter() {
       if (this.authStore.isAllowed) {
         const redirect = this.$route.query.redirect;
         await this.$router.push(typeof redirect === 'string' ? redirect : {name: 'courses'});
@@ -148,6 +179,11 @@ export default defineComponent({
 
   &__error {
     margin-bottom: 1rem;
+  }
+
+  &__note {
+    margin: 0.75rem 0 0;
+    color: var(--app-muted);
   }
 
   &__button {

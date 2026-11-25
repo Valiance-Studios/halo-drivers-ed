@@ -8,6 +8,7 @@ import {LessonService} from '#src/lessons/lessonService.ts';
 import {PostgresAllowlistRepository} from '#src/repositories/allowlistRepository.ts';
 import {PostgresBookingRepository} from '#src/repositories/bookingRepository.ts';
 import {PostgresCatalogRepository} from '#src/repositories/catalogRepository.ts';
+import {PostgresDemoRepository} from '#src/repositories/demoRepository.ts';
 import {PostgresLessonRepository} from '#src/repositories/lessonRepository.ts';
 
 const config = loadConfig();
@@ -20,6 +21,7 @@ const app = createApp({
   verifier: createFirebaseTokenVerifier(config.firebaseProjectId),
   allowlist: new PostgresAllowlistRepository(db),
   catalog,
+  demo: new PostgresDemoRepository(db),
   bookings: new BookingService(new PostgresBookingRepository(db), catalog),
   lessons: new LessonService(new PostgresLessonRepository(db), catalog),
 });
