@@ -79,6 +79,25 @@
           </p>
         </li>
       </ul>
+      <LessonNotes
+        :model-value="notes"
+        :disabled="saving || !canMark"
+        @update:model-value="editNotes"
+      />
+      <p
+        v-if="markStates[notesKey] === 'failed'"
+        class="lesson-form__failed"
+        role="alert"
+      >
+        <span>Notes not saved</span>
+        <Button
+          label="Retry"
+          severity="secondary"
+          outlined
+          aria-label="Retry saving the notes"
+          @click="saveNotes"
+        />
+      </p>
       <p
         class="lesson-form__line lesson-form__note"
         role="status"
@@ -109,12 +128,21 @@
       >
         {{ notice }}
       </Message>
+      <LessonHistory :lessons="form.history" />
     </template>
   </section>
 </template>
 
 <script lang="ts">
-import type {AdminLesson, Attendance, LessonForm, SignOffScope, SkillResult, SkillResults} from '@hde/shared';
+import type {
+  AdminLesson,
+  Attendance,
+  InstructorForm,
+  LessonNotes as Notes,
+  SignOffScope,
+  SkillResult,
+  SkillResults,
+} from '@hde/shared';
 import type {MarkState} from '@/utils/markSaver';
 
 import {defineComponent, markRaw} from 'vue';
@@ -126,11 +154,17 @@ import {useCatalogStore} from '@/stores/catalog';
 import {STATUS_NAMES} from '@/utils/lessonStatus';
 import {lessonDayAndTime} from '@/utils/lessonTime';
 import {MarkSaver} from '@/utils/markSaver';
+import LessonHistory from '@/components/LessonHistory.vue';
+import LessonNotes from '@/components/LessonNotes.vue';
 import ResultToggle from '@/components/ResultToggle.vue';
 
 /** How often to check whether the lesson has started or ended. */
 const CLOCK_MS = 15_000;
-const UNSAVED_MESSAGE = 'Some marks are not saved. Leave and lose them?';
+/** How long typing must pause before the notes are saved. */
+const NOTES_DELAY_MS = 800;
+/** The notes' place in `markStates`, next to the skills' ids. */
+const NOTES_KEY = '$notes';
+const UNSAVED_MESSAGE = 'Some changes are not saved. Leave and lose them?';
 
 /**
  * An instructor's form for one lesson. Each mark saves as it is made, until the lesson is signed off; corrections
@@ -138,9 +172,10 @@ const UNSAVED_MESSAGE = 'Some marks are not saved. Leave and lose them?';
  */
 export default defineComponent({
   name: 'LessonFormView',
-  components: {ResultToggle},
+  components: {LessonHistory, LessonNotes, ResultToggle},
   async beforeRouteLeave(): Promise<boolean> {
-    await this.saver?.settled();
+    this.flushNotes();
+    await Promise.all([this.saver?.settled(), this.notesSaver?.settled()]);
 
     // A signed-out account can no longer save, so there is nothing to stay for.
     return this.isSaved || !this.authStore.isAllowed || window.confirm(UNSAVED_MESSAGE);
@@ -151,10 +186,14 @@ export default defineComponent({
   data() {
     return {
       lesson: null as AdminLesson | null,
-      form: null as LessonForm | null,
+      form: null as InstructorForm | null,
       results: {} as SkillResults,
       markStates: {} as Record<string, MarkState>,
-      saver: null as MarkSaver | null,
+      saver: null as MarkSaver<SkillResult | null> | null,
+      notes: {student: '', private: ''} as Notes,
+      notesSaver: null as MarkSaver<Notes> | null,
+      notesTimer: undefined as number | undefined,
+      notesKey: NOTES_KEY,
       clock: undefined as number | undefined,
       loading: true,
       saving: false,
@@ -196,7 +235,7 @@ export default defineComponent({
       const states = Object.values(this.markStates);
 
       if (states.includes('failed')) {
-        return 'Some marks are not saved.';
+        return 'Some changes are not saved.';
       }
 
       if (states.includes('saving')) {
@@ -240,6 +279,12 @@ export default defineComponent({
     const save = (skillId: string, result: SkillResult | null) =>
       api.markSkill(this.scope, this.id, skillId, {result, early: this.early});
     this.saver = markRaw(new MarkSaver(save, (skillId, state) => this.setMarkState(skillId, state)));
+    this.notesSaver = markRaw(
+      new MarkSaver(
+        (_, notes: Notes) => api.saveNotes(this.scope, this.id, {notes, early: this.early}),
+        (key, state) => this.setNotesState(key, state),
+      ),
+    );
   },
   mounted() {
     void this.catalogStore.load();
@@ -251,6 +296,7 @@ export default defineComponent({
   },
   beforeUnmount() {
     window.clearInterval(this.clock);
+    window.clearTimeout(this.notesTimer);
     window.removeEventListener('beforeunload', this.warnBeforeUnload);
   },
   methods: {
@@ -272,6 +318,7 @@ export default defineComponent({
         api.getLessonForm(this.scope, this.id),
       ]);
       this.results = {...this.form.results};
+      this.notes = {student: this.form.studentNote, private: this.form.privateNote};
       this.now = new Date();
     },
     mark(skillId: string, result: SkillResult | null) {
@@ -282,6 +329,35 @@ export default defineComponent({
       if (!this.isSignedOff) {
         this.hasMarked = true;
         this.saver?.mark(skillId, result);
+      }
+    },
+    /** Saves once typing pauses, but counts as unsaved from the first key. */
+    editNotes(notes: Notes) {
+      this.notes = notes;
+      this.notice = '';
+
+      if (!this.isSignedOff) {
+        this.hasMarked = true;
+        this.setMarkState(NOTES_KEY, 'saving');
+        window.clearTimeout(this.notesTimer);
+        this.notesTimer = window.setTimeout(this.saveNotes, NOTES_DELAY_MS);
+      }
+    },
+    saveNotes() {
+      this.notesTimer = undefined;
+      this.notesSaver?.mark(NOTES_KEY, this.notes);
+    },
+    /** Saves notes still waiting for a pause in typing. */
+    flushNotes() {
+      if (this.notesTimer !== undefined) {
+        window.clearTimeout(this.notesTimer);
+        this.saveNotes();
+      }
+    },
+    /** An earlier save finishing does not make newer, waiting text saved. */
+    setNotesState(key: string, state: MarkState | null) {
+      if (this.notesTimer === undefined) {
+        this.setMarkState(key, state);
       }
     },
     retry(skillId: string) {
@@ -304,6 +380,7 @@ export default defineComponent({
       try {
         const {status} = await api.signOffLesson(this.scope, this.id, {
           results: this.results,
+          notes: this.notes,
           attendance,
           early: this.early,
         });

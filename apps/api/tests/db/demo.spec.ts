@@ -137,7 +137,7 @@ describe('demo slots', () => {
 });
 
 describe('guests', () => {
-  it('start one lesson short of completing the Warthog, with one lesson repeated', async () => {
+  it('start one lesson short of completing the Warthog, with the latest one to repeat', async () => {
     await demo.claim('a', NOW);
     const email = await guestEmail('a');
     const lessons = await new PostgresBookingRepository(db).listForStudent(email);
@@ -147,8 +147,8 @@ describe('guests', () => {
       ['mongoose', 'completed'],
       ['warthog', 'completed'],
       ['warthog', 'completed'],
-      ['warthog', 'repeat'],
       ['warthog', 'completed'],
+      ['warthog', 'repeat'],
     ]);
     expect(await db.select().from(skillResults).where(eq(skillResults.result, 'fail'))).toHaveLength(1);
   });
@@ -191,7 +191,12 @@ describe('guests', () => {
     expect(lesson.number).toBe(4);
 
     const results = Object.fromEntries(lesson.skills.map((skill) => [skill.id, 'pass' as const]));
-    await lessonService.signOff(id, {results, attendance: 'attended', early: true}, email, email);
+    await lessonService.signOff(
+      id,
+      {results, notes: {student: '', private: ''}, attendance: 'attended', early: true},
+      email,
+      email,
+    );
     expect(await book('scorpion')).toMatchObject({status: 'booked'});
     expect(await book('hornet')).toMatchObject({status: 'booked'});
   });

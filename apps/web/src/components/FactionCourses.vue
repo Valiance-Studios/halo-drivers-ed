@@ -32,6 +32,8 @@
       v-if="vehicle"
       :key="vehicle.slug"
       :lessons="catalogStore.lessonsOf(vehicle.slug)"
+      :results="progressStore.resultsIn(vehicle)"
+      :next-lesson="progressStore.nextLesson(vehicle)"
     />
     <h2 class="faction-courses__heading">Instructors</h2>
     <InstructorList :instructors="catalogStore.instructorsOf(faction)" />

@@ -65,8 +65,10 @@ const lessonRepository: LessonRepository = {
     lesson: {...BOOKING, studentEmail: 'pat@example.com', studentName: 'Pat'},
     studentBookings: [BOOKING],
     marked: [],
+    notes: new Map(),
   }),
   update: async () => null,
+  listAttended: async () => [],
 };
 
 /** Accepts the ID token "valid-<email>" ("valid-guest" is anonymous) and the App Check token "app". */
@@ -201,7 +203,14 @@ describe('API', () => {
     expect(await lessons.json()).toEqual([{...BOOKING, studentEmail: 'pat@example.com', studentName: 'Pat'}]);
 
     const form = await get(makeApp(), `/api/admin/lessons/${BOOKING.id}/form`, SIGNED_IN);
-    expect(await form.json()).toEqual({lesson: LESSON, results: {}, passedBefore: []});
+    expect(await form.json()).toEqual({
+      lesson: LESSON,
+      results: {},
+      passedBefore: [],
+      studentNote: '',
+      privateNote: '',
+      history: [],
+    });
   });
 
   it.each([
@@ -209,6 +218,7 @@ describe('API', () => {
     ['GET', `/api/admin/lessons/${BOOKING.id}`],
     ['GET', `/api/admin/lessons/${BOOKING.id}/form`],
     ['PUT', `/api/admin/lessons/${BOOKING.id}/results/startEngine`],
+    ['PUT', `/api/admin/lessons/${BOOKING.id}/notes`],
     ['PUT', `/api/admin/lessons/${BOOKING.id}/sign-off`],
   ])('keeps students out of %s %s', async (method, path) => {
     const headers = {...SIGNED_IN, Authorization: 'Bearer valid-sam@example.com'};
@@ -226,7 +236,14 @@ describe('API', () => {
     ['results/startEngine', '{}'],
     ['results/startEngine', '{"result":"maybe"}'],
     ['results/startEngine', '{"result":"pass","early":"yes"}'],
-    ['sign-off', '{"results":{},"attendance":"missed","early":1}'],
+    ['sign-off', '{"results":{},"notes":{"student":"","private":""},"attendance":"missed","early":1}'],
+    ['sign-off', '{"results":{},"attendance":"missed"}'],
+    ['notes', '{}'],
+    ['notes', '{"notes":{"student":"Only one"}}'],
+    ['notes', '{"notes":{"student":7,"private":""}}'],
+    ['notes', '{"notes":{"student":"\\u0000","private":""}}'],
+    ['notes', '{"notes":{"student":"","private":""},"early":"yes"}'],
+    ['notes', JSON.stringify({notes: {student: 'x'.repeat(1001), private: ''}})],
   ])('rejects %s with %s', async (path, body) => {
     const response = await makeApp().request(`/api/admin/lessons/${BOOKING.id}/${path}`, {
       method: 'PUT',

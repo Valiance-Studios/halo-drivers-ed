@@ -1,31 +1,29 @@
-import type {SkillResult} from '@hde/shared';
-
 export type MarkState = 'saving' | 'failed';
 
 /**
- * Saves each skill's mark as it is made. A skill's marks go one at a time, and only its latest one is sent next,
- * so quick taps cannot arrive out of order. Different skills save at the same time.
+ * Saves each item's value as it changes: a skill's mark, or the notes. An item's values go one at a time, and only
+ * its latest one is sent next, so quick changes cannot arrive out of order. Different items save at the same time.
  */
-export class MarkSaver {
-  private readonly save: (skillId: string, result: SkillResult | null) => Promise<unknown>;
-  private readonly onState: (skillId: string, state: MarkState | null) => void;
-  private readonly waiting = new Map<string, SkillResult | null>();
+export class MarkSaver<Value> {
+  private readonly save: (id: string, value: Value) => Promise<unknown>;
+  private readonly onState: (id: string, state: MarkState | null) => void;
+  private readonly waiting = new Map<string, Value>();
   private readonly running = new Map<string, Promise<void>>();
 
   constructor(
-    save: (skillId: string, result: SkillResult | null) => Promise<unknown>,
-    onState: (skillId: string, state: MarkState | null) => void,
+    save: (id: string, value: Value) => Promise<unknown>,
+    onState: (id: string, state: MarkState | null) => void,
   ) {
     this.save = save;
     this.onState = onState;
   }
 
-  mark(skillId: string, result: SkillResult | null): void {
-    this.waiting.set(skillId, result);
+  mark(id: string, value: Value): void {
+    this.waiting.set(id, value);
 
-    if (!this.running.has(skillId)) {
-      const run = this.run(skillId).finally(() => this.running.delete(skillId));
-      this.running.set(skillId, run);
+    if (!this.running.has(id)) {
+      const run = this.run(id).finally(() => this.running.delete(id));
+      this.running.set(id, run);
     }
   }
 
@@ -36,22 +34,22 @@ export class MarkSaver {
     }
   }
 
-  private async run(skillId: string): Promise<void> {
-    this.onState(skillId, 'saving');
+  private async run(id: string): Promise<void> {
+    this.onState(id, 'saving');
     let failed = false;
 
-    while (this.waiting.has(skillId)) {
-      const result = this.waiting.get(skillId) ?? null;
-      this.waiting.delete(skillId);
+    while (this.waiting.has(id)) {
+      const value = this.waiting.get(id) as Value;
+      this.waiting.delete(id);
 
       try {
-        await this.save(skillId, result);
+        await this.save(id, value);
         failed = false;
       } catch {
         failed = true;
       }
     }
 
-    this.onState(skillId, failed ? 'failed' : null);
+    this.onState(id, failed ? 'failed' : null);
   }
 }

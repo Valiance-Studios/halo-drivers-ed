@@ -214,6 +214,9 @@ export const bookings = pgTable(
     endsAt: timestamp({withTimezone: true}).notNull(),
     status: bookingStatusEnum().notNull().default('booked'),
     lessonNumber: integer(),
+    /** For the student to read, and only for instructors. Empty if there are none. */
+    studentNote: text().notNull().default(''),
+    privateNote: text().notNull().default(''),
     signedOffBy: text(),
     signedOffAt: timestamp({withTimezone: true}),
     createdAt: timestamp({withTimezone: true}).notNull().defaultNow(),
@@ -229,6 +232,10 @@ export const bookings = pgTable(
       columns: [table.vehicleSlug, table.faction],
       foreignColumns: [vehicles.slug, vehicles.faction],
     }),
+    check(
+      'bookings_note_length',
+      sql`char_length(${table.studentNote}) <= 1000 and char_length(${table.privateNote}) <= 1000`,
+    ),
     check('bookings_order', sql`${table.startsAt} < ${table.endsAt}`),
     // The target of skill_results' vehicle-matching foreign key.
     unique('bookings_id_vehicle_key').on(table.id, table.vehicleSlug),

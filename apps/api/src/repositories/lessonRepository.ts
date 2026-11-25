@@ -1,8 +1,8 @@
-import type {AdminLesson, Booking, BookingStatus, SkillResults} from '@hde/shared';
+import type {AdminLesson, AttendedLesson, Booking, BookingStatus, LessonNotes, SkillResults} from '@hde/shared';
 import type {Database} from '#src/db/client.ts';
 import type {BookingRow} from '#src/repositories/bookingRepository.ts';
 
-import {and, asc, eq} from 'drizzle-orm';
+import {and, asc, eq, inArray} from 'drizzle-orm';
 import {allowedUsers, bookings, skillResults} from '#src/db/schema.ts';
 import {toBooking} from '#src/repositories/bookingRepository.ts';
 
@@ -13,24 +13,31 @@ export interface MarkedResults {
   results: SkillResults;
 }
 
-/** A lesson and what decides its form: the student's other lessons, and their results in this course. */
+/** A lesson and what decides its form: the student's other lessons, and their results and notes in this course. */
 export interface LessonContext {
   lesson: AdminLesson;
   studentBookings: Booking[];
   marked: MarkedResults[];
+  /** By booking id. */
+  notes: Map<string, LessonNotes>;
 }
 
 export interface LessonChange {
   /** The course's lesson the results are for. */
   markedLesson: number;
-  results: SkillResults;
-  /** Null leaves the lesson as it is, saving only the results. */
+  /** Null leaves the results as they are. */
+  results: SkillResults | null;
+  /** Null leaves the notes as they are. */
+  notes: LessonNotes | null;
+  /** Null leaves the lesson as it is, saving only the results and notes. */
   signOff: {status: BookingStatus; lessonNumber: number | null; by: string; at: Date} | null;
 }
 
 export interface LessonRepository {
   /** Lessons that were not cancelled, soonest first; null means every instructor's, or every student's. */
   list(instructorSlug: string | null, studentEmail: string | null): Promise<AdminLesson[]>;
+  /** The student's lessons that were signed off as attended, with their results, soonest first. */
+  listAttended(studentEmail: string): Promise<AttendedLesson[]>;
   findContext(id: string): Promise<LessonContext | null>;
   /**
    * Makes the change `decide` returns, unless it throws. The student's lessons cannot change meanwhile. Null if
@@ -70,6 +77,36 @@ export class PostgresLessonRepository implements LessonRepository {
       .map(({booking, studentName}) => toAdminLesson(booking, studentName));
   }
 
+  async listAttended(studentEmail: string): Promise<AttendedLesson[]> {
+    const attended = and(eq(bookings.studentEmail, studentEmail), inArray(bookings.status, ['completed', 'repeat']));
+    const rows = await this.db.select().from(bookings).where(attended).orderBy(asc(bookings.startsAt));
+    const resultRows = await this.db
+      .select({bookingId: skillResults.bookingId, skillId: skillResults.skillId, result: skillResults.result})
+      .from(skillResults)
+      .innerJoin(bookings, eq(bookings.id, skillResults.bookingId))
+      .where(attended);
+    const results = new Map<string, SkillResults>();
+
+    for (const {bookingId, skillId, result} of resultRows) {
+      results.set(bookingId, {...results.get(bookingId), [skillId]: result});
+    }
+
+    return rows.flatMap(({id, vehicleSlug, lessonNumber, status, startsAt}) =>
+      lessonNumber === null
+        ? []
+        : [
+            {
+              bookingId: id,
+              vehicleSlug,
+              lessonNumber,
+              status,
+              startsAt: startsAt.toISOString(),
+              results: results.get(id) ?? {},
+            },
+          ],
+    );
+  }
+
   async findContext(id: string): Promise<LessonContext | null> {
     return this.loadContext(this.db, id);
   }
@@ -93,36 +130,42 @@ export class PostgresLessonRepository implements LessonRepository {
         return null;
       }
 
-      const {markedLesson, results, signOff} = decide(context);
-      const rows = Object.entries(results).map(([skillId, result]) => ({
-        bookingId: id,
-        vehicleSlug: context.lesson.vehicleSlug,
-        lessonNumber: markedLesson,
-        skillId,
-        result,
-      }));
-      await tx.delete(skillResults).where(eq(skillResults.bookingId, id));
+      const {markedLesson, results, notes, signOff} = decide(context);
 
-      if (rows.length > 0) {
-        await tx.insert(skillResults).values(rows);
+      if (results) {
+        const rows = Object.entries(results).map(([skillId, result]) => ({
+          bookingId: id,
+          vehicleSlug: context.lesson.vehicleSlug,
+          lessonNumber: markedLesson,
+          skillId,
+          result,
+        }));
+        await tx.delete(skillResults).where(eq(skillResults.bookingId, id));
+
+        if (rows.length > 0) {
+          await tx.insert(skillResults).values(rows);
+        }
       }
 
-      if (!signOff) {
+      if (!notes && !signOff) {
         return context.lesson;
       }
 
-      const [signedOff] = await tx
+      const [changed] = await tx
         .update(bookings)
         .set({
-          status: signOff.status,
-          lessonNumber: signOff.lessonNumber,
-          signedOffBy: signOff.by,
-          signedOffAt: signOff.at,
+          ...(notes && {studentNote: notes.student, privateNote: notes.private}),
+          ...(signOff && {
+            status: signOff.status,
+            lessonNumber: signOff.lessonNumber,
+            signedOffBy: signOff.by,
+            signedOffAt: signOff.at,
+          }),
         })
         .where(eq(bookings.id, id))
         .returning();
 
-      return signedOff ? toAdminLesson(signedOff, context.lesson.studentName) : null;
+      return changed ? toAdminLesson(changed, context.lesson.studentName) : null;
     });
   }
 
@@ -167,6 +210,11 @@ export class PostgresLessonRepository implements LessonRepository {
       lesson: toAdminLesson(row, studentName),
       studentBookings: studentRows.map(toBooking),
       marked: [...marked.values()],
+      notes: new Map(
+        studentRows
+          .filter(({vehicleSlug}) => vehicleSlug === row.vehicleSlug)
+          .map((other) => [other.id, {student: other.studentNote, private: other.privateNote}]),
+      ),
     };
   }
 }

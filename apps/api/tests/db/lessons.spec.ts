@@ -9,7 +9,9 @@ import {INSTRUCTORS, VEHICLES} from '#src/db/catalogData.ts';
 import {bookings, skillResults} from '#src/db/schema.ts';
 import {seedCatalog} from '#src/db/seed.ts';
 import {LessonService} from '#src/lessons/lessonService.ts';
+import {NOTE_MAX_LENGTH} from '@hde/shared';
 import {PostgresAllowlistRepository} from '#src/repositories/allowlistRepository.ts';
+import {PostgresBookingRepository} from '#src/repositories/bookingRepository.ts';
 import {PostgresCatalogRepository} from '#src/repositories/catalogRepository.ts';
 import {PostgresLessonRepository} from '#src/repositories/lessonRepository.ts';
 import {TEST_DATABASE_URL} from './database.ts';
@@ -22,6 +24,7 @@ const ADMIN = 'admin@example.com';
 const NOW = new Date('2026-06-10T12:00:00Z');
 const service = new LessonService(new PostgresLessonRepository(db), catalog, () => NOW);
 
+const NO_NOTES = {student: '', private: ''};
 const at = (day: number, hour = 12) => new Date(Date.UTC(2026, 5, day, hour));
 
 /** Books a one-hour lesson and returns its id. */
@@ -43,7 +46,7 @@ function marks(number: number, result: SkillResult, except: SkillResults = {}, v
 }
 
 const signOff = (id: string, results: SkillResults) =>
-  service.signOff(id, {results, attendance: 'attended', early: false}, ADMIN, null);
+  service.signOff(id, {results, notes: NO_NOTES, attendance: 'attended', early: false}, ADMIN, null);
 
 async function errorCode(call: Promise<unknown>): Promise<string | undefined> {
   return call.then(
@@ -111,7 +114,12 @@ describe('lesson forms', () => {
     expect(await errorCode(during.mark(id, 'winch', {result: null, early: false}, null))).toBe('invalid-request');
     expect(
       await errorCode(
-        during.signOff(id, {results: marks(1, 'pass'), attendance: 'attended', early: false}, ADMIN, null),
+        during.signOff(
+          id,
+          {results: marks(1, 'pass'), notes: NO_NOTES, attendance: 'attended', early: false},
+          ADMIN,
+          null,
+        ),
       ),
     ).toBe('too-early');
   });
@@ -125,7 +133,7 @@ describe('lesson forms', () => {
     expect(await errorCode(signOff(id, marks(1, 'pass')))).toBe('too-early');
     const signedOff = service.signOff(
       id,
-      {results: marks(1, 'pass'), attendance: 'attended', early: true},
+      {results: marks(1, 'pass'), notes: NO_NOTES, attendance: 'attended', early: true},
       ADMIN,
       null,
     );
@@ -164,7 +172,7 @@ describe('lesson forms', () => {
     const id = await book(at(8));
     const missed = await service.signOff(
       id,
-      {results: {startEngine: 'pass'}, attendance: 'missed', early: false},
+      {results: {startEngine: 'pass'}, notes: NO_NOTES, attendance: 'missed', early: false},
       ADMIN,
       null,
     );
@@ -223,7 +231,12 @@ describe('lesson forms', () => {
     const own = await book(at(8));
     const other = await book(at(9), 'mongoose', OTHER);
     const signOffAs = (id: string, student: string) =>
-      service.signOff(id, {results: marks(1, 'pass'), attendance: 'attended', early: false}, student, student);
+      service.signOff(
+        id,
+        {results: marks(1, 'pass'), notes: NO_NOTES, attendance: 'attended', early: false},
+        student,
+        student,
+      );
 
     expect(await service.list(null, STUDENT)).toMatchObject([{id: own}]);
     expect(await service.list('arbiter', STUDENT)).toEqual([]);
@@ -248,7 +261,100 @@ describe('lesson forms', () => {
   });
 });
 
+describe('lesson notes', () => {
+  const NOTES = {student: 'Brake sooner.', private: 'Nervous on hills.'};
+  const signOffWith = (id: string, results: SkillResults, notes = NOTES) =>
+    service.signOff(id, {results, notes, attendance: 'attended', early: false}, ADMIN, null);
+
+  it('are saved on their own, without touching the marks', async () => {
+    const id = await book(at(8));
+    await Promise.all([
+      service.mark(id, 'startEngine', {result: 'pass', early: false}, null),
+      service.saveNotes(id, {notes: NOTES, early: false}, null),
+    ]);
+
+    expect(await service.form(id, null)).toMatchObject({
+      results: {startEngine: 'pass'},
+      studentNote: NOTES.student,
+      privateNote: NOTES.private,
+    });
+  });
+
+  it('follow the same rules as marks', async () => {
+    const id = await book(at(20));
+    const save = (early: boolean, student: string | null = null) =>
+      errorCode(service.saveNotes(id, {notes: NOTES, early}, student));
+
+    expect(await save(false)).toBe('too-early');
+    expect(await save(true, OTHER)).toBe('not-found');
+    expect(await save(true)).toBeUndefined();
+
+    const past = await book(at(8));
+    await signOff(past, marks(1, 'pass'));
+    expect(await errorCode(service.saveNotes(past, {notes: NOTES, early: false}, null))).toBe('sign-off-conflict');
+  });
+
+  it('can be corrected by signing off again', async () => {
+    const id = await book(at(8));
+    await signOffWith(id, marks(1, 'pass'));
+    await signOffWith(id, marks(1, 'pass'), {...NOTES, student: 'Well done.'});
+
+    expect((await service.studentForm(STUDENT, id)).studentNote).toBe('Well done.');
+  });
+
+  it('never give the student the private one', async () => {
+    const id = await book(at(8));
+    await service.saveNotes(id, {notes: NOTES, early: false}, null);
+    expect(await errorCode(service.studentForm(STUDENT, id))).toBe('not-found');
+
+    await signOffWith(id, marks(1, 'fail'));
+    const form = await service.studentForm(STUDENT, id);
+    expect(form.studentNote).toBe(NOTES.student);
+    const bookingList = await new PostgresBookingRepository(db).listForStudent(STUDENT);
+    const sent = JSON.stringify([form, bookingList, await service.studentResults(STUDENT)]);
+    expect(sent).not.toContain(NOTES.private);
+  });
+
+  it('are in the history of later lessons in the course, with their results', async () => {
+    const [first, second, missed] = [await book(at(6)), await book(at(7)), await book(at(8))];
+    await signOffWith(first, marks(1, 'pass', {parkingBrake: 'fail'}));
+    await signOffWith(second, {parkingBrake: 'pass'}, NO_NOTES);
+    await service.signOff(missed, {results: {}, notes: NO_NOTES, attendance: 'missed', early: false}, ADMIN, null);
+    const later = await book(at(9));
+    await book(at(5), 'warthog');
+    await book(at(5, 15), 'mongoose', OTHER);
+
+    expect((await service.form(first, null)).history).toEqual([]);
+    expect((await service.form(later, null)).history).toMatchObject([
+      {id: missed, status: 'missed', lesson: null, results: {}},
+      {id: second, status: 'completed', lesson: {number: 1}, results: marks(1, 'pass')},
+      {id: first, status: 'repeat', lesson: {number: 1}, results: {parkingBrake: 'fail'}, notes: NOTES},
+    ]);
+  });
+
+  it("lists a student's own results in the lessons they attended", async () => {
+    const [first, second] = [await book(at(7)), await book(at(8))];
+    await signOffWith(first, marks(1, 'pass'));
+    await service.mark(second, 'tightTurns', {result: 'pass', early: false}, null);
+
+    expect(await service.studentResults(STUDENT)).toMatchObject([
+      {bookingId: first, lessonNumber: 1, status: 'completed', results: marks(1, 'pass')},
+    ]);
+    expect(await service.studentResults(OTHER)).toEqual([]);
+  });
+});
+
 describe('lesson constraints', () => {
+  it.each(['studentNote', 'privateNote'])('rejects a %s that is too long', async (note) => {
+    const id = await book(at(8));
+    const update = db
+      .update(bookings)
+      .set({[note]: 'x'.repeat(NOTE_MAX_LENGTH + 1)})
+      .where(eq(bookings.id, id));
+
+    expect(await constraint(update)).toBe('bookings_note_length');
+  });
+
   it('rejects a completed lesson without its number or signature', async () => {
     const id = await book(at(8));
     const update = (set: object) => constraint(db.update(bookings).set(set).where(eq(bookings.id, id)));

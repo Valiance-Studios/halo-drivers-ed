@@ -1,4 +1,4 @@
-import type {Booking, BookingRequest} from '@hde/shared';
+import type {AttendedLesson, Booking, BookingRequest} from '@hde/shared';
 
 import {defineStore} from 'pinia';
 import {api} from '@/services/api';
@@ -6,6 +6,8 @@ import {api} from '@/services/api';
 export interface BookingsState {
   /** The student's lessons, soonest first. */
   bookings: Booking[];
+  /** Their results in the lessons they have attended, soonest first. */
+  results: AttendedLesson[];
   loaded: boolean;
   errorMessage: string | null;
 }
@@ -14,6 +16,7 @@ export interface BookingsState {
 export const useBookingsStore = defineStore('bookings', {
   state: (): BookingsState => ({
     bookings: [],
+    results: [],
     loaded: false,
     errorMessage: null,
   }),
@@ -22,7 +25,9 @@ export const useBookingsStore = defineStore('bookings', {
       this.errorMessage = null;
 
       try {
-        this.replaceAll(await api.listBookings());
+        const [bookings, results] = await Promise.all([api.listBookings(), api.listResults()]);
+        this.replaceAll(bookings);
+        this.results = results;
         this.loaded = true;
       } catch (error) {
         this.errorMessage = `Could not load your lessons: ${error instanceof Error ? error.message : 'unknown error'}`;

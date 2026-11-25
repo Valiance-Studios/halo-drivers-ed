@@ -167,7 +167,7 @@ async function addHistory(tx: Transaction, slotId: number, studentEmail: string,
     const lesson = lessons[index];
 
     if (lesson) {
-      const {vehicle, lessonNumber, status} = lesson;
+      const {vehicle, lessonNumber, status, notes} = lesson;
       const [booking] = await tx
         .insert(bookings)
         .values({
@@ -178,6 +178,8 @@ async function addHistory(tx: Transaction, slotId: number, studentEmail: string,
           ...time,
           status,
           lessonNumber,
+          studentNote: notes?.student,
+          privateNote: notes?.private,
           signedOffBy: 'demo',
           signedOffAt: time.endsAt,
         })

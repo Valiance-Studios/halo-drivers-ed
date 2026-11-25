@@ -17,27 +17,33 @@
       v-else-if="!form"
       aria-label="Loading results"
     />
-    <ul
-      v-else
-      class="lesson-results"
-    >
-      <li
-        v-for="skill in form.lesson.skills"
-        :key="skill.id"
-        class="lesson-results__skill"
+    <template v-else>
+      <ul class="lesson-results">
+        <li
+          v-for="skill in form.lesson.skills"
+          :key="skill.id"
+          class="lesson-results__skill"
+        >
+          <span>{{ skill.label }}</span>
+          <strong>{{ resultName(form.results[skill.id]) }}</strong>
+        </li>
+      </ul>
+      <p
+        v-if="form.studentNote"
+        class="lesson-results__note"
       >
-        <span>{{ skill.label }}</span>
-        <strong>{{ resultName(form.results[skill.id]) }}</strong>
-      </li>
-    </ul>
+        <strong>From your instructor:</strong> {{ form.studentNote }}
+      </p>
+    </template>
   </Dialog>
 </template>
 
 <script lang="ts">
-import type {LessonForm, SkillResult} from '@hde/shared';
+import type {LessonForm} from '@hde/shared';
 
 import {defineComponent} from 'vue';
 import {api} from '@/services/api';
+import {resultName} from '@/utils/skillResult';
 
 /** A student's results in one of their lessons. */
 export default defineComponent({
@@ -58,15 +64,7 @@ export default defineComponent({
       this.errorMessage = error instanceof Error ? error.message : 'Could not load the results.';
     }
   },
-  methods: {
-    resultName(result: SkillResult | undefined): string {
-      if (!result) {
-        return 'Not marked';
-      }
-
-      return result === 'pass' ? 'Passed' : 'Needs practice';
-    },
-  },
+  methods: {resultName},
 });
 </script>
 
@@ -87,5 +85,11 @@ export default defineComponent({
       flex: none;
     }
   }
+}
+
+.lesson-results__note {
+  margin: 1rem 0 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 </style>

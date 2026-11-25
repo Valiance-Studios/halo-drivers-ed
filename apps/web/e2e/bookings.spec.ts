@@ -7,8 +7,8 @@ test('books a course until its lessons run out, and cancels', async ({page}) => 
   await signInWithGoogle(page, ALLOWED_USER);
   await expect(page.getByRole('heading', {name: 'Courses'})).toBeVisible();
 
-  await bookLesson(page, 'Mongoose');
-  await bookLesson(page, 'Mongoose');
+  await bookLesson(page, 'Book Mongoose lesson');
+  await bookLesson(page, 'Book Mongoose lesson');
   await expect(page.getByRole('button', {name: 'Book Mongoose lesson'})).toBeDisabled();
   await expect(page.getByText('You have booked every lesson in this course.')).toBeVisible();
 

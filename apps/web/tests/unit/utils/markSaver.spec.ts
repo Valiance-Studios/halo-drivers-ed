@@ -15,7 +15,7 @@ function setup() {
         pending.push({resolve, reject});
       }),
   );
-  const saver = new MarkSaver(save, (skillId, state) => {
+  const saver = new MarkSaver<SkillResult | null>(save, (skillId, state) => {
     states[skillId] = state;
   });
 

@@ -1,16 +1,20 @@
 import type {
   AdminLesson,
   ApiErrorBody,
+  AttendedLesson,
   ApiErrorCode,
   Booking,
   BookingRequest,
   CourseLesson,
   DemoSession,
   Instructor,
+  InstructorForm,
   LessonForm,
+  LessonNotes,
   LessonSignOff,
   LessonSlot,
   Me,
+  NotesRequest,
   SignOffScope,
   SkillMark,
   Vehicle,
@@ -95,6 +99,11 @@ export class ApiClient {
     return this.get('/curriculum');
   }
 
+  /** The student's own results in every lesson they have attended. */
+  listResults(): Promise<AttendedLesson[]> {
+    return this.get('/results');
+  }
+
   /** The student's own results in a lesson that has been signed off. */
   getResults(id: string): Promise<LessonForm> {
     return this.get(`/bookings/${encodeURIComponent(id)}/form`);
@@ -111,13 +120,17 @@ export class ApiClient {
     return this.get(`/${scope}/lessons/${encodeURIComponent(id)}`);
   }
 
-  getLessonForm(scope: SignOffScope, id: string): Promise<LessonForm> {
+  getLessonForm(scope: SignOffScope, id: string): Promise<InstructorForm> {
     return this.get(`/${scope}/lessons/${encodeURIComponent(id)}/form`);
   }
 
   /** Saves one skill's mark; null clears it. */
   markSkill(scope: SignOffScope, id: string, skillId: string, mark: SkillMark): Promise<SkillMark> {
     return this.put(`/${scope}/lessons/${encodeURIComponent(id)}/results/${encodeURIComponent(skillId)}`, mark);
+  }
+
+  saveNotes(scope: SignOffScope, id: string, request: NotesRequest): Promise<LessonNotes> {
+    return this.put(`/${scope}/lessons/${encodeURIComponent(id)}/notes`, request);
   }
 
   signOffLesson(scope: SignOffScope, id: string, signOff: LessonSignOff): Promise<AdminLesson> {

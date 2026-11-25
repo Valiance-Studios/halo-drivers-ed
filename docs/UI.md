@@ -26,7 +26,7 @@ Tabs for **UNSC** and **Covenant**, opening on the theme's faction. Each tab sho
 
 - **Route map**: the vehicles joined by their prerequisites, left to right, each with its picture, name, Ground or Air, total hours and, once the student has attended a lesson, how many lessons are completed (such as 2/4). UNSC routes are angled roads and Covenant routes are curves. A course whose prerequisites are not complete has a lock on it and a gray picture, and can still be selected. On narrow screens it is a list that names each prerequisite.
 - **Selected vehicle**: its picture, description, course length, lessons completed (once started), prerequisite courses and instructors, and a button to book a lesson. The button is disabled and gray, with the reason below it, for a locked course (which courses to complete first) and once every lesson is booked. If a lesson needs repeating, the button books that repeat, and is disabled once it is booked until it is completed. The first vehicle is selected to begin with; selecting another scrolls this into view if needed.
-- **Lesson plan**: the selected course's lessons, each opening to the skills marked in it.
+- **Lesson plan**: the selected course's lessons, each opening to the skills marked in it. Lessons the student has attended say how they went, with each skill's latest result, and the one to take next says **Next**.
 - **Instructors**: each instructor's picture, name, title and bio.
 
 The catalog loads once per visit; a failure shows an error message in place of the tabs.
@@ -37,7 +37,7 @@ A dialog to choose an instructor, a day and a time in the next 14 days, in the v
 
 ## My Lessons (`/lessons`)
 
-**Upcoming** lessons, then **Past and cancelled** ones, with the vehicle, time, instructor and status. An upcoming lesson can be cancelled until 24 hours before it starts. **See results** shows how each skill went in a lesson that was signed off as attended.
+**Upcoming** lessons, then **Past and cancelled** ones, with the vehicle, time, instructor and status. An upcoming lesson can be cancelled until 24 hours before it starts. **See results** shows how each skill went in a lesson that was signed off as attended, and the instructor's note.
 
 ## Schedule (`/schedule`)
 
@@ -48,6 +48,8 @@ Admins and demo guests only; others are sent to Courses. Guests see only their o
 The student's name (their email until they have signed in) and the lesson's skills, each marked **Pass** or **Fail**; choosing the same one again clears it. Skills the student passed in an earlier attempt are shown as passed and cannot change. A line says what signing off would do.
 
 - **Marks save as they are made**, from when the lesson starts, with a line saying whether everything is saved. One that fails shows **Not saved** and **Retry**; leaving the page with unsaved marks asks first.
+- **Notes**: one the student reads with their results, and a private one for instructors. They save like marks, once typing pauses.
+- **Earlier lessons in this course**, latest first, each opening to its results and notes.
 - **Sign off lesson** works once the lesson has ended and every skill is marked and saved: all passed completes it, and otherwise the student repeats it.
 - **Student missed it** works once the lesson has ended, and discards any marks.
 

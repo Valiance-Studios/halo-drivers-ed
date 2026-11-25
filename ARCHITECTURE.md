@@ -243,7 +243,7 @@ sequenceDiagram
 
 - **Identity.** A guest is an `allowed_users` row with the role `guest` and a made-up `@demo.invalid` address, so bookings, locks and cascades work as for anyone else. A check constraint ties the role to that domain, where no real address can exist, and the allowlist lookup never returns guests. They are found by the anonymous `uid` in their slot, only until it expires (`demo-ended` after that).
 - **Limits.** Guests are students, and can book `DEMO_BOOKING_LIMIT` lessons, counting cancelled and signed-off ones. The check runs under the same lock as the other booking rules.
-- **Past lessons.** Guests start with the Mongoose course and three of the Warthog's four lessons completed, one of them on its second try (`demoHistory.ts`). Completing the last one unlocks the Scorpion and the Hornet. Each slot's are in a week of its own, in free times, so guests never clash.
+- **Past lessons.** Guests start with the Mongoose course and three of the Warthog's four lessons completed, and the fourth, their latest, to repeat (`demoHistory.ts`). Completing it unlocks the Scorpion and the Hornet. Each slot's are in a week of its own, in free times, so guests never clash.
 - **Expired guests** lose access at once. Their data is deleted by the next claim, or the next request their lessons could affect: `GET /api/slots`, `POST /api/bookings` and `GET /api/admin/lessons` (`clearExpiredDemos`). Signing out deletes it immediately.
 - **Anonymous accounts** are deleted by the browser on sign-out, or when the demo is full or over, unless Firebase refuses. A visitor who closes the tab leaves theirs in Firebase; deleting those would need Identity Platform or an API that may delete Firebase users.
 - **In the schedule**, guests' lessons are hidden unless an admin checks "Show demo guests".
@@ -259,7 +259,7 @@ The scope is `admin` for admins (`requireAdmin`), who sign off everyone's lesson
 stateDiagram-v2
     [*] --> booked
     booked --> cancelled: student cancels, 24 hours before
-    booked --> booked: skill marked
+    booked --> booked: skill marked or notes saved
     booked --> completed: attended, every skill passed
     booked --> repeat: attended, some not passed
     booked --> missed: student missed it
@@ -272,6 +272,8 @@ stateDiagram-v2
 ```
 
 - Only `completed` counts toward the course. After `repeat`, the next lesson has the same form, with the skills already passed kept.
+- **Notes.** A lesson has a note for the student and a private one, saved together (`PUT .../notes`) from when the lesson starts, apart from the marks, and corrected by signing off again. Students get only their own note, in `LessonForm`, once the lesson is signed off as attended. `InstructorForm` adds the private one and the history.
+- **History.** An instructor's form has the student's earlier signed-off lessons in the course, with results and notes. The student's own results (`GET /api/results`) are shown in the courses page's lesson plan.
 - Lessons in a course are signed off in order, and one can be corrected until a later one is signed off.
 - A correction is refused if it would lock a course the student has lessons in, or leave them with more lessons than the course has.
 - `PostgresLessonRepository.update` takes the same lock on the student's `allowed_users` row as booking does, so neither can change what the other decided on.
@@ -338,6 +340,8 @@ erDiagram
         timestamptz ends_at
         booking_status status
         int lesson_number FK
+        text student_note
+        text private_note
         text signed_off_by
         timestamptz signed_off_at
         timestamptz created_at
@@ -398,7 +402,7 @@ erDiagram
 - `instructor_availability` holds wall-clock times in `America/New_York`, seeded from `apps/api/src/db/availabilityData.ts`.
 - `allowed_users.display_name` is the Google account's name, stored by `GET /api/me` at sign-in, so instructors can see who a student is.
 - `course_lessons` and `lesson_skills` are seeded from `apps/api/src/db/curriculumData.ts`. A skill dropped from the data becomes inactive rather than deleted, since results refer to it, so skill ids must not be reused.
-- Checks on `bookings` require a signature on signed-off lessons, and a lesson number on attended ones.
+- Checks on `bookings` require a signature on signed-off lessons, and a lesson number on attended ones, and limit the notes to 1,000 characters each.
 - The catalog (vehicles, instructors, who teaches what) is seed data in `apps/api/src/db/catalogData.ts`, loaded by `npm run db:seed`. Instructors are seeded characters, not accounts.
 - Schema changes: edit `apps/api/src/db/schema.ts`, run `npm run db:generate`, and commit the new file in `apps/api/drizzle/`.
 
@@ -420,12 +424,6 @@ One image holds both entry points. Migrations and the catalog seed run as their 
 ## Planned Design
 
 Agreed, not built yet. Build these on their own branches, in this order.
-
-### Lesson Notes and Student History
-
-- Instructors write a note on the form that the student can read with their results, since a student who must repeat a lesson is not told why. Perhaps also a private one for the next instructor.
-- The form shows the student's past results, repeated skills and notes. It only carries over passed skills today.
-- A student's view of each course: skills passed, skills to repeat and what the next lesson covers.
 
 ### Instructor Cancellation and Time Off
 
@@ -476,7 +474,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - Locks on courses whose prerequisites are not complete, enforced by the API.
 - Course progress on the route map and in the vehicle's panel, and repeats before the next lesson.
 - Booking: instructor hours, lesson times, booking and cancelling, My lessons, and exclusion constraints against double-booking.
-- Lesson plans (53 lessons), instructors' lesson forms, sign-off that unlocks courses, and admins' schedule with View As. Demo guests have the same for their own lessons. Deployed and tried on the site on 2026-11-24.
+- Lesson plans (53 lessons), instructors' lesson forms, sign-off that unlocks courses, notes and student history (deployed and tried on the site on 2026-11-24), and admins' schedule with View As. Demo guests have the same for their own lessons. Deployed and tried on the site on 2026-11-24.
 - A `student` role, which can book but not sign off.
 - [Demo](#demo) slots for recruiters: 10 at once, 2 hours each. Deployed and tried on the site on 2026-11-24, including that signing out removes the anonymous account.
 - UNSC and Covenant themes, each light and dark, with placeholder artwork.
@@ -498,8 +496,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### Next: Features
 
-1. [Lesson notes and student history](#lesson-notes-and-student-history).
-2. [Instructor cancellation and time off](#instructor-cancellation-and-time-off).
-3. [Rescheduling](#rescheduling).
-4. [Certificates](#certificates).
-5. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. Flat shapes drawn in code cannot get close. See [Artwork](docs/UI.md#artwork).
+1. [Instructor cancellation and time off](#instructor-cancellation-and-time-off).
+2. [Rescheduling](#rescheduling).
+3. [Certificates](#certificates).
+4. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. Flat shapes drawn in code cannot get close. See [Artwork](docs/UI.md#artwork).

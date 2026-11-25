@@ -1,10 +1,15 @@
 import type {
   AdminLesson,
+  AttendedLesson,
   Booking,
   BookingStatus,
   CourseLesson,
+  InstructorForm,
   LessonForm,
+  LessonNotes,
   LessonSignOff,
+  NotesRequest,
+  PastLesson,
   SkillMark,
   SkillResults,
   Vehicle,
@@ -39,10 +44,19 @@ export class LessonService {
     return (await this.context(id, student)).lesson;
   }
 
-  async form(id: string, student: string | null): Promise<LessonForm> {
+  async form(id: string, student: string | null): Promise<InstructorForm> {
     const [context, curriculum] = await Promise.all([this.context(id, student), this.catalog.listCurriculum()]);
 
-    return lessonForm(context, curriculum);
+    return {
+      ...lessonForm(context, curriculum),
+      privateNote: notesOf(context, id).private,
+      history: pastLessons(context, curriculum),
+    };
+  }
+
+  /** The student's own results, in every lesson they have attended. */
+  studentResults(email: string): Promise<AttendedLesson[]> {
+    return this.lessons.listAttended(email);
   }
 
   /** A student's own form, once the lesson is signed off as attended. */
@@ -62,14 +76,7 @@ export class LessonService {
     const lesson = await this.lessons.update(id, (context) => {
       checkStudent(context, student);
 
-      if (!early && this.now() < new Date(context.lesson.startsAt)) {
-        throw new ApiError(409, 'too-early', 'Skills can be marked once the lesson starts.');
-      }
-
-      if (context.lesson.status !== 'booked') {
-        throw conflict('This lesson is already signed off or cancelled. Sign it off again to correct it.');
-      }
-
+      this.checkOpen(context, early);
       const form = lessonForm(context, curriculum);
       const {[skillId]: _previous, ...others} = form.results;
       // Also checks that the skill is in the lesson when clearing it.
@@ -78,8 +85,23 @@ export class LessonService {
       return {
         markedLesson: form.lesson.number,
         results: withPasses(result ? {...others, [skillId]: result} : others, form.passedBefore),
+        notes: null,
         signOff: null,
       };
+    });
+
+    if (!lesson) {
+      throw lessonNotFound();
+    }
+  }
+
+  /** Saves the notes, leaving the marks alone. */
+  async saveNotes(id: string, {notes, early}: NotesRequest, student: string | null): Promise<void> {
+    const lesson = await this.lessons.update(id, (context) => {
+      checkStudent(context, student);
+      this.checkOpen(context, early);
+
+      return {markedLesson: 0, results: null, notes, signOff: null};
     });
 
     if (!lesson) {
@@ -107,6 +129,17 @@ export class LessonService {
     }
 
     return lesson;
+  }
+
+  /** Marks and notes are saved from when a lesson starts until it is signed off. */
+  private checkOpen({lesson}: LessonContext, early: boolean): void {
+    if (!early && this.now() < new Date(lesson.startsAt)) {
+      throw new ApiError(409, 'too-early', 'A lesson can be marked once it starts.');
+    }
+
+    if (lesson.status !== 'booked') {
+      throw conflict('This lesson is already signed off or cancelled. Sign it off again to correct it.');
+    }
   }
 
   private async context(id: string, student: string | null): Promise<LessonContext> {
@@ -169,7 +202,34 @@ function lessonForm(context: LessonContext, curriculum: CourseLesson[]): LessonF
     Object.entries(own?.results ?? {}).filter(([skillId]) => courseLesson.skills.some(({id}) => id === skillId)),
   );
 
-  return {lesson: courseLesson, results: withPasses(results, passedBefore), passedBefore};
+  return {
+    lesson: courseLesson,
+    results: withPasses(results, passedBefore),
+    passedBefore,
+    studentNote: notesOf(context, lesson.id).student,
+  };
+}
+
+function notesOf({notes}: LessonContext, id: string): LessonNotes {
+  return notes.get(id) ?? {student: '', private: ''};
+}
+
+/** The student's earlier lessons in the course, latest first. */
+function pastLessons(context: LessonContext, curriculum: CourseLesson[]): PastLesson[] {
+  const {lesson, marked} = context;
+
+  return courseBookings(context)
+    .filter(({startsAt, status}) => startsAt < lesson.startsAt && status !== 'booked' && status !== 'cancelled')
+    .map(({id, vehicleSlug, instructorSlug, startsAt, status, lessonNumber}) => ({
+      id,
+      instructorSlug,
+      startsAt,
+      status,
+      lesson: curriculum.find((item) => item.vehicleSlug === vehicleSlug && item.number === lessonNumber) ?? null,
+      results: marked.find((item) => item.bookingId === id && item.lessonNumber === lessonNumber)?.results ?? {},
+      notes: notesOf(context, id),
+    }))
+    .reverse();
 }
 
 function withPasses(results: SkillResults, passed: string[]): SkillResults {
@@ -209,7 +269,7 @@ function checkOrder(context: LessonContext): void {
 function decideSignOff(
   context: LessonContext,
   form: LessonForm,
-  {results: submitted, attendance}: LessonSignOff,
+  {results: submitted, notes, attendance}: LessonSignOff,
   vehicles: Vehicle[],
   signature: {by: string; at: Date},
 ): LessonChange {
@@ -218,7 +278,7 @@ function decideSignOff(
   if (attendance === 'missed') {
     checkConsequences(context, 'missed', vehicles);
 
-    return {markedLesson, results: {}, signOff: {status: 'missed', lessonNumber: null, ...signature}};
+    return {markedLesson, results: {}, notes, signOff: {status: 'missed', lessonNumber: null, ...signature}};
   }
 
   const results = mergeResults(form, submitted);
@@ -230,7 +290,7 @@ function decideSignOff(
   const status = allPassed(form.lesson, results) ? 'completed' : 'repeat';
   checkConsequences(context, status, vehicles);
 
-  return {markedLesson, results, signOff: {status, lessonNumber: markedLesson, ...signature}};
+  return {markedLesson, results, notes, signOff: {status, lessonNumber: markedLesson, ...signature}};
 }
 
 /** Corrections must not leave the student with too many lessons, or with lessons in a course that locks again. */

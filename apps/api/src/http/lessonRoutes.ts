@@ -1,9 +1,9 @@
-import type {LessonSignOff, Me, SkillMark, SkillResults} from '@hde/shared';
+import type {LessonNotes, LessonSignOff, Me, NotesRequest, SkillMark, SkillResults} from '@hde/shared';
 import type {SignedInEnv} from '#src/http/signedIn.ts';
 import type {LessonService} from '#src/lessons/lessonService.ts';
 
 import {Hono} from 'hono';
-import {ATTENDANCES, SKILL_RESULTS} from '@hde/shared';
+import {ATTENDANCES, NOTE_MAX_LENGTH, SKILL_RESULTS} from '@hde/shared';
 import {ApiError} from '#src/http/errors.ts';
 import {lessonId} from '#src/http/lessonId.ts';
 import {requireAdmin, requireGuest} from '#src/http/signedIn.ts';
@@ -29,22 +29,49 @@ function parseSkillMark(body: unknown): SkillMark {
   return {result: known, early};
 }
 
+function isNote(value: unknown): value is string {
+  // Postgres text cannot hold a null character.
+  return typeof value === 'string' && value.length <= NOTE_MAX_LENGTH && !value.includes('\0');
+}
+
+function parseNotes(value: unknown): LessonNotes {
+  const {student, private: privateNote} = (value ?? {}) as Record<string, unknown>;
+
+  if (!isNote(student) || !isNote(privateNote)) {
+    throw new ApiError(400, 'invalid-request', `Send both notes, each up to ${NOTE_MAX_LENGTH} characters.`);
+  }
+
+  return {student, private: privateNote};
+}
+
+function parseNotesRequest(body: unknown): NotesRequest {
+  const {notes, early = false} = (body ?? {}) as Record<string, unknown>;
+
+  if (typeof early !== 'boolean') {
+    throw new ApiError(400, 'invalid-request', 'Send the notes, and whether they are early.');
+  }
+
+  return {notes: parseNotes(notes), early};
+}
+
 function parseSignOff(body: unknown): LessonSignOff {
-  const {results, attendance, early = false} = (body ?? {}) as Record<string, unknown>;
+  const {results, notes, attendance, early = false} = (body ?? {}) as Record<string, unknown>;
   const known = ATTENDANCES.find((value) => value === attendance);
 
   if (!isSkillResults(results) || !known || typeof early !== 'boolean') {
     throw new ApiError(400, 'invalid-request', 'Send the skill results and how the lesson ended.');
   }
 
-  return {results, attendance: known, early};
+  return {results, notes: parseNotes(notes), attendance: known, early};
 }
 
 /** The signed-in student's own results. */
 export function lessonRoutes(service: LessonService): Hono<SignedInEnv> {
-  return new Hono<SignedInEnv>().get('/bookings/:id/form', async (c) =>
-    c.json(await service.studentForm(c.var.me.email, lessonId(c.req.param('id')))),
-  );
+  return new Hono<SignedInEnv>()
+    .get('/results', async (c) => c.json(await service.studentResults(c.var.me.email)))
+    .get('/bookings/:id/form', async (c) =>
+      c.json(await service.studentForm(c.var.me.email, lessonId(c.req.param('id')))),
+    );
 }
 
 /** Every student's lessons, for admins. */
@@ -79,6 +106,12 @@ function signOffRoutes(service: LessonService, studentFor: (me: Me) => string | 
       await service.mark(lessonId(c.req.param('id')), c.req.param('skillId'), mark, studentFor(c.var.me));
 
       return c.json(mark);
+    })
+    .put('/lessons/:id/notes', async (c) => {
+      const request = parseNotesRequest(await c.req.json().catch(() => null));
+      await service.saveNotes(lessonId(c.req.param('id')), request, studentFor(c.var.me));
+
+      return c.json(request.notes);
     })
     .put('/lessons/:id/sign-off', async (c) => {
       const signOff = parseSignOff(await c.req.json().catch(() => null));
