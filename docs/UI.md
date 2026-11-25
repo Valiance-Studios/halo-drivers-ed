@@ -24,8 +24,8 @@ A heading, the theme's road and vehicle (Warthog or Ghost), and a card with **Si
 
 Tabs for **UNSC** and **Covenant**, opening on the theme's faction. Each tab shows:
 
-- **Route map**: the vehicles joined by their prerequisites, left to right, each with its picture, name, Ground or Air, and total hours. UNSC routes are angled roads and Covenant routes are curves. A course whose prerequisites are not complete has a lock on it and a gray picture, and can still be selected. On narrow screens it is a list that names each prerequisite.
-- **Selected vehicle**: its picture, description, course length, prerequisite courses and instructors, and a button to book a lesson. The button is disabled and gray, with the reason below it, for a locked course (which courses to complete first) and once every lesson is booked. The first vehicle is selected to begin with; selecting another scrolls this into view if needed.
+- **Route map**: the vehicles joined by their prerequisites, left to right, each with its picture, name, Ground or Air, total hours and, once the student has attended a lesson, how many lessons are completed (such as 2/4). UNSC routes are angled roads and Covenant routes are curves. A course whose prerequisites are not complete has a lock on it and a gray picture, and can still be selected. On narrow screens it is a list that names each prerequisite.
+- **Selected vehicle**: its picture, description, course length, lessons completed (once started), prerequisite courses and instructors, and a button to book a lesson. The button is disabled and gray, with the reason below it, for a locked course (which courses to complete first) and once every lesson is booked. If a lesson needs repeating, the button books that repeat, and is disabled once it is booked until it is completed. The first vehicle is selected to begin with; selecting another scrolls this into view if needed.
 - **Lesson plan**: the selected course's lessons, each opening to the skills marked in it.
 - **Instructors**: each instructor's picture, name, title and bio.
 

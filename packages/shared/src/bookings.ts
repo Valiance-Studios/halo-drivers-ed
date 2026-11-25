@@ -63,6 +63,30 @@ export function lessonsLeft(vehicle: Vehicle, bookings: readonly Booking[]): num
   return Math.max(0, vehicle.lessonsRequired - used);
 }
 
+/** How many of a course's lessons the student has completed, or null if they have not attended one yet. */
+export function lessonsCompleted(vehicle: Vehicle, bookings: readonly Booking[]): number | null {
+  const attended = bookings.filter(
+    ({vehicleSlug, status}) => vehicleSlug === vehicle.slug && (status === 'completed' || status === 'repeat'),
+  );
+
+  return attended.length > 0 ? attended.filter(({status}) => status === 'completed').length : null;
+}
+
+/** The lesson of a course the student has to repeat before going on to the next, or null if there is none. */
+export function repeatDue(vehicle: Vehicle, bookings: readonly Booking[]): number | null {
+  const own = bookings.filter(({vehicleSlug}) => vehicleSlug === vehicle.slug);
+  const completed = own.filter(({status}) => status === 'completed').map(({lessonNumber}) => lessonNumber);
+
+  return (
+    own.find(({status, lessonNumber}) => status === 'repeat' && !completed.includes(lessonNumber))?.lessonNumber ?? null
+  );
+}
+
+/** Whether a lesson of the course is booked and not signed off. While one has to be repeated, this must be it. */
+export function hasLessonBooked(vehicle: Vehicle, bookings: readonly Booking[]): boolean {
+  return bookings.some(({vehicleSlug, status}) => vehicleSlug === vehicle.slug && status === 'booked');
+}
+
 /** Slugs of the courses whose required lessons are all completed. */
 export function completedCourses(vehicles: readonly Vehicle[], bookings: readonly Booking[]): string[] {
   return vehicles

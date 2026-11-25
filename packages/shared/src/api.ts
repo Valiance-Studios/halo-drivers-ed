@@ -20,6 +20,7 @@ export const API_ERROR_CODES = [
   'rate-limited',
   'course-locked',
   'no-lessons-left',
+  'repeat-due',
   'slot-unavailable',
   'too-late-to-cancel',
   'too-early',

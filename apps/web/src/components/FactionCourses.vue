@@ -15,6 +15,9 @@
       :instructors="catalogStore.instructorsFor(vehicle.slug)"
       :missing-names="progressStore.missingFor(vehicle).map(catalogStore.vehicleName)"
       :lessons-left="progressStore.lessonsLeft(vehicle)"
+      :lessons-completed="progressStore.lessonsCompleted(vehicle)"
+      :repeat-lesson="progressStore.repeatDue(vehicle)"
+      :has-lesson-booked="progressStore.hasLessonBooked(vehicle)"
       :notice="notice"
       @book="openBooking"
     />

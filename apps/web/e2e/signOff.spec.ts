@@ -52,6 +52,9 @@ test('an instructor signs lessons off, which unlocks the next course for the stu
 
   await signInWithGoogle(page, STUDENT_USER);
   await expect(page.getByRole('heading', {name: 'Courses'})).toBeVisible();
+  await expect(page.getByRole('button', {name: /^Mongoose.*2\/2 lessons completed/})).toBeVisible();
+  await expect(page.locator('.vehicle-detail').getByText('2/2', {exact: true})).toBeVisible();
+  await expect(page.getByText(/lessons completed/)).toHaveCount(1);
   await page.getByRole('button', {name: /^Warthog/}).click();
   await expect(page.getByRole('button', {name: 'Book Warthog lesson'})).toBeEnabled();
 
