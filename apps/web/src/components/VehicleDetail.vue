@@ -18,7 +18,7 @@
       </p>
       <Button
         class="vehicle-detail__book"
-        :label="`Book ${vehicle.name} lesson`"
+        :label="bookLabel"
         :icon="isLocked ? 'pi pi-lock' : 'pi pi-calendar'"
         :severity="reason ? 'secondary' : undefined"
         :disabled="Boolean(reason)"
@@ -32,6 +32,12 @@
       >
         {{ reason }}
       </p>
+      <p
+        v-else-if="repeatLesson !== null"
+        class="vehicle-detail__reason"
+      >
+        Lesson {{ repeatLesson }} needs repeating before you go on to the next one.
+      </p>
       <Message
         v-if="notice"
         class="vehicle-detail__notice"
@@ -43,6 +49,10 @@
     <dl class="vehicle-detail__facts">
       <dt>Course</dt>
       <dd>{{ vehicle.lessonsRequired }} lessons, {{ vehicle.lessonMinutes }} min each</dd>
+      <template v-if="progress">
+        <dt>Completed</dt>
+        <dd>{{ progress }}</dd>
+      </template>
       <dt>Total time</dt>
       <dd>{{ totalHours(vehicle) }}</dd>
       <dt>Requires</dt>
@@ -58,7 +68,7 @@ import type {PropType} from 'vue';
 import type {Instructor, Vehicle} from '@hde/shared';
 
 import {defineComponent} from 'vue';
-import {totalHours} from '@/utils/vehicleText';
+import {progressText, totalHours} from '@/utils/vehicleText';
 import SubjectArt from '@/components/SubjectArt.vue';
 
 /** One vehicle's course: what it covers, how long it takes, who teaches it, and booking it. */
@@ -73,6 +83,12 @@ export default defineComponent({
     missingNames: {type: Array as PropType<string[]>, required: true},
     /** How many more of the course's lessons can be booked. */
     lessonsLeft: {type: Number, required: true},
+    /** How many of the course's lessons are completed; null before the student starts it. */
+    lessonsCompleted: {type: Number as PropType<number | null>, default: null},
+    /** The lesson to repeat before going on, if any. */
+    repeatLesson: {type: Number as PropType<number | null>, default: null},
+    /** Whether a lesson of the course is already booked. */
+    hasLessonBooked: {type: Boolean, required: true},
     /** A message about booking, shown under the button. */
     notice: {type: String, default: ''},
   },
@@ -83,10 +99,22 @@ export default defineComponent({
     isLocked(): boolean {
       return this.missingNames.length > 0;
     },
+    bookLabel(): string {
+      return this.repeatLesson !== null && !this.reason
+        ? `Repeat ${this.vehicle.name} lesson ${this.repeatLesson}`
+        : `Book ${this.vehicle.name} lesson`;
+    },
+    progress(): string {
+      return progressText(this.vehicle, this.lessonsCompleted);
+    },
     /** Why the course cannot be booked, or nothing if it can. */
     reason(): string {
       if (this.isLocked) {
         return `Complete ${this.missingNames.join(' and ')} first.`;
+      }
+
+      if (this.repeatLesson !== null && this.hasLessonBooked) {
+        return `Lesson ${this.repeatLesson} needs repeating and is booked. You can book the next one once it is completed.`;
       }
 
       return this.lessonsLeft === 0 ? 'You have booked every lesson in this course.' : '';

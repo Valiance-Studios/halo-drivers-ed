@@ -8,8 +8,10 @@ import {
   canCancel,
   CANCELLATION_NOTICE_HOURS,
   completedCourses,
+  hasLessonBooked,
   lessonsLeft,
   missingPrerequisites,
+  repeatDue,
 } from '@hde/shared';
 import {findSlots} from '#src/bookings/lessonSlots.ts';
 import {ApiError} from '#src/http/errors.ts';
@@ -75,6 +77,12 @@ export class BookingService {
 
         if (missingPrerequisites(vehicle, completedCourses(vehicles, existing)).length > 0) {
           throw new ApiError(409, 'course-locked', 'Complete the courses this one requires first.');
+        }
+
+        const repeat = repeatDue(vehicle, existing);
+
+        if (repeat !== null && hasLessonBooked(vehicle, existing)) {
+          throw new ApiError(409, 'repeat-due', `Complete lesson ${repeat} before booking the next one.`);
         }
 
         if (lessonsLeft(vehicle, existing) === 0) {

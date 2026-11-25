@@ -200,14 +200,14 @@ sequenceDiagram
     R->>P: BEGIN, SELECT allowed_users FOR UPDATE
     R->>P: SELECT the student's bookings
     R->>S: check(existing)
-    Note right of S: 409 course-locked or no-lessons-left
+    Note right of S: 409 course-locked, repeat-due<br/>or no-lessons-left
     R->>P: INSERT INTO bookings
     Note right of P: overlap (23P01): 409 slot-unavailable
     R->>P: COMMIT
     S-->>D: 201 Booking
 ```
 
-A lesson can be cancelled until 24 hours before it starts. It counts toward its course when completed, and a missed or cancelled lesson can be booked again. Completed courses are worked out from the bookings (`completedCourses` in `@hde/shared`), by the API to enforce locks and by `stores/progress.ts` to show them.
+A lesson can be cancelled until 24 hours before it starts. It counts toward its course when completed, and a missed or cancelled lesson can be booked again. While a lesson has to be repeated, only its repeat can be booked: one lesson at a time in that course (`repeatDue`), until it is completed. Lessons already booked when it was marked stay booked, and the soonest becomes the repeat. Completed courses are worked out from the bookings (`completedCourses` in `@hde/shared`), by the API to enforce locks and by `stores/progress.ts` to show them.
 
 ## Demo
 
@@ -438,7 +438,10 @@ A student moves a lesson to another time in one transaction, under the same 24-h
 
 ### Certificates
 
-A license for each completed course.
+A license for each completed course. Once its lessons are all completed:
+
+- Its card on the route map has a ribbon icon, next to the lesson count (`4/4`).
+- Its panel says "Course Completed" in place of the booking button, with a "View Certificate" link, and also shows the count.
 
 ### Ideas, Not Planned
 
@@ -471,6 +474,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - Postgres schema and first migration: vehicles, prerequisites, instructors, who teaches what, allowlist. Seeded catalog of 10 vehicles and 6 instructors.
 - Courses page: vehicles on a route map of their prerequisites, and instructors, by faction.
 - Locks on courses whose prerequisites are not complete, enforced by the API.
+- Course progress on the route map and in the vehicle's panel, and repeats before the next lesson.
 - Booking: instructor hours, lesson times, booking and cancelling, My lessons, and exclusion constraints against double-booking.
 - Lesson plans (53 lessons), instructors' lesson forms, sign-off that unlocks courses, and admins' schedule with View As. Demo guests have the same for their own lessons. Deployed and tried on the site on 2026-11-24.
 - A `student` role, which can book but not sign off.

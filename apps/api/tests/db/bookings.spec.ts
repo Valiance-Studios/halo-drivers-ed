@@ -2,6 +2,7 @@ import type {BookingStatus} from '@hde/shared';
 import type {NewBooking} from '#src/repositories/bookingRepository.ts';
 
 import {afterAll, beforeAll, beforeEach, describe, expect, it} from 'vite-plus/test';
+import {eq} from 'drizzle-orm';
 import {BookingService} from '#src/bookings/bookingService.ts';
 import {connect} from '#src/db/client.ts';
 import {bookings, instructorAvailability} from '#src/db/schema.ts';
@@ -161,6 +162,18 @@ describe('BookingService', () => {
 
     await db.insert(bookings).values({...lesson({startsAt: at(2, 12), endsAt: at(2, 13)}), ...COMPLETED});
     expect(await errorCode(service.book(STUDENT, warthog))).toBeUndefined();
+  });
+
+  it('allows only the repeat to be booked until it is completed, even when booked together', async () => {
+    const repeat = {status: 'repeat' as const, lessonNumber: 1, signedOffBy: OTHER, signedOffAt: NOW};
+    await db.insert(bookings).values({...lesson({startsAt: at(1, 12), endsAt: at(1, 13)}), ...repeat});
+    const codes = await Promise.all([9, 10].map((day) => errorCode(service.book(STUDENT, mongoose(at(day, 12))))));
+    expect(codes).toContain(undefined);
+    expect(codes).toContain('repeat-due');
+
+    // Once it is completed, the next lesson can be booked.
+    await db.update(bookings).set(COMPLETED).where(eq(bookings.status, 'booked'));
+    expect(await errorCode(service.book(STUDENT, mongoose(at(11, 12))))).toBeUndefined();
   });
 
   it('cancels a lesson with a day of notice, which frees its time', async () => {

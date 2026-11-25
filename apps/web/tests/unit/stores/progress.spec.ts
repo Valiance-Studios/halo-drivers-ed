@@ -18,14 +18,14 @@ const vehicle = (slug: string, ...prerequisites: string[]): Vehicle => ({
   lessonsRequired: 2,
   prerequisites,
 });
-const lesson = (vehicleSlug: string, status: BookingStatus): Booking => ({
+const lesson = (vehicleSlug: string, status: BookingStatus, lessonNumber: number | null = null): Booking => ({
   id: `${vehicleSlug}-${status}`,
   vehicleSlug,
   instructorSlug: 'arbiter',
   startsAt: '2026-06-08T12:00:00.000Z',
   endsAt: '2026-06-08T13:00:00.000Z',
   status,
-  lessonNumber: null,
+  lessonNumber,
 });
 const FIRST = vehicle('first');
 const SECOND = vehicle('second', 'first');
@@ -50,6 +50,33 @@ describe('progress store', () => {
 
     useBookingsStore().bookings = [lesson('first', 'completed'), lesson('first', 'completed')];
     expect(store.missingFor(SECOND)).toEqual([]);
+  });
+
+  it('shows progress only once a lesson has been attended', () => {
+    const store = useProgressStore();
+    useBookingsStore().bookings = [
+      lesson('first', 'booked'),
+      lesson('first', 'missed'),
+      lesson('second', 'completed', 1),
+    ];
+    expect(store.lessonsCompleted(FIRST)).toBeNull();
+
+    useBookingsStore().bookings = [lesson('first', 'repeat', 1)];
+    expect(store.lessonsCompleted(FIRST)).toBe(0);
+
+    useBookingsStore().bookings = [lesson('first', 'repeat', 1), lesson('first', 'completed', 1)];
+    expect(store.lessonsCompleted(FIRST)).toBe(1);
+  });
+
+  it('has a lesson to repeat until it is completed', () => {
+    const store = useProgressStore();
+    useBookingsStore().bookings = [lesson('first', 'completed', 1), lesson('first', 'repeat', 2)];
+    expect(store.repeatDue(FIRST)).toBe(2);
+    expect(store.repeatDue(SECOND)).toBeNull();
+    expect(store.hasLessonBooked(FIRST)).toBe(false);
+
+    useBookingsStore().bookings = [lesson('first', 'repeat', 1), lesson('first', 'completed', 1)];
+    expect(store.repeatDue(FIRST)).toBeNull();
   });
 
   it('counts booked and completed lessons, but not cancelled, missed or repeated ones', () => {

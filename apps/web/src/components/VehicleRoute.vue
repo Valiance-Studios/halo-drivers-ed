@@ -48,6 +48,9 @@
       <span class="vehicle-route__name">{{ vehicle.name }}</span>
       <span class="vehicle-route__meta">
         <span>{{ domainName(vehicle) }}</span>
+        <span v-if="progress(vehicle)">
+          {{ progress(vehicle) }}<span class="visually-hidden"> lessons completed</span>
+        </span>
         <span>{{ totalHours(vehicle) }}</span>
       </span>
       <span class="vehicle-route__after">{{ afterText(vehicle) }}</span>
@@ -71,7 +74,7 @@ import {mapStores} from 'pinia';
 import {useCatalogStore} from '@/stores/catalog';
 import {useProgressStore} from '@/stores/progress';
 import {layoutRoute, ROUTE_HEIGHT, ROUTE_WIDTH} from '@/utils/routeLayout';
-import {domainName, totalHours} from '@/utils/vehicleText';
+import {domainName, progressText, totalHours} from '@/utils/vehicleText';
 import SubjectArt from '@/components/SubjectArt.vue';
 
 /** A faction's vehicles, joined by their prerequisites. Locked ones can still be selected. On narrow screens, a list. */
@@ -103,6 +106,9 @@ export default defineComponent({
     totalHours,
     isLocked(vehicle: Vehicle): boolean {
       return this.progressStore.missingFor(vehicle).length > 0;
+    },
+    progress(vehicle: Vehicle): string {
+      return progressText(vehicle, this.progressStore.lessonsCompleted(vehicle));
     },
     afterText(vehicle: Vehicle): string {
       return vehicle.prerequisites.length > 0
