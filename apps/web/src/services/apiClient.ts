@@ -15,6 +15,7 @@ import type {
   LessonSlot,
   Me,
   NotesRequest,
+  RescheduleRequest,
   SignOffScope,
   SkillMark,
   TimeOff,
@@ -92,6 +93,15 @@ export class ApiClient {
 
   createBooking(request: BookingRequest): Promise<Booking> {
     return this.post('/bookings', request);
+  }
+
+  /** The times a booked lesson can be moved to. */
+  listRescheduleSlots(id: string, instructorSlug: string): Promise<LessonSlot[]> {
+    return this.get(`/bookings/${encodeURIComponent(id)}/slots?${new URLSearchParams({instructor: instructorSlug})}`);
+  }
+
+  rescheduleBooking(id: string, request: RescheduleRequest): Promise<Booking> {
+    return this.post(`/bookings/${encodeURIComponent(id)}/reschedule`, request);
   }
 
   cancelBooking(id: string): Promise<Booking> {

@@ -1,13 +1,19 @@
 <template>
   <Dialog
     :visible="true"
-    :header="`Book a ${vehicle.name} lesson`"
+    :header="header"
     modal
     :draggable="false"
     class="booking-dialog"
     :style="{width: 'min(34rem, calc(100vw - 2rem))'}"
     @update:visible="$emit('close')"
   >
+    <p
+      v-if="lesson"
+      class="booking-dialog__note"
+    >
+      Now {{ lessonDayAndTime(lesson.startsAt) }}. It keeps this time until you choose another.
+    </p>
     <label
       class="booking-dialog__label"
       for="booking-instructor"
@@ -69,7 +75,7 @@
         v-if="isFinal"
         class="booking-dialog__note"
       >
-        This lesson starts within {{ noticeHours }} hours, so it cannot be cancelled.
+        This lesson starts within {{ noticeHours }} hours, so it cannot be cancelled or rescheduled.
       </p>
     </template>
     <p v-else-if="!errorMessage">
@@ -84,10 +90,10 @@
         @click="$emit('close')"
       />
       <Button
-        label="Book lesson"
+        :label="lesson ? 'Reschedule lesson' : 'Book lesson'"
         :disabled="!startsAt"
         :loading="saving"
-        @click="book"
+        @click="save"
       />
     </template>
   </Dialog>
@@ -102,22 +108,24 @@ import {mapStores} from 'pinia';
 import {BOOKING_WINDOW_DAYS, CANCELLATION_NOTICE_HOURS, hasCancellationNotice} from '@hde/shared';
 import {api} from '@/services/api';
 import {useBookingsStore} from '@/stores/bookings';
-import {lessonDay, lessonTime, timeZoneName} from '@/utils/lessonTime';
+import {lessonDay, lessonDayAndTime, lessonTime, timeZoneName} from '@/utils/lessonTime';
 
-/** Books one lesson: an instructor, a day and a time. */
+/** Books one lesson, or reschedules one: an instructor, a day and a time. */
 export default defineComponent({
   name: 'BookingDialog',
   props: {
     vehicle: {type: Object as PropType<Vehicle>, required: true},
     instructors: {type: Array as PropType<Instructor[]>, required: true},
+    /** The lesson to reschedule; null books a new one. */
+    lesson: {type: Object as PropType<Booking | null>, default: null},
   },
   emits: {
     close: () => true,
-    booked: (booking: Booking) => booking.id.length > 0,
+    saved: (booking: Booking) => booking.id.length > 0,
   },
   data() {
     return {
-      instructorSlug: this.instructors[0]?.slug ?? '',
+      instructorSlug: this.lesson?.instructorSlug ?? this.instructors[0]?.slug ?? '',
       slots: [] as LessonSlot[],
       day: null as string | null,
       startsAt: null as string | null,
@@ -130,10 +138,13 @@ export default defineComponent({
   },
   computed: {
     ...mapStores(useBookingsStore),
+    header(): string {
+      return this.lesson ? `Reschedule your ${this.vehicle.name} lesson` : `Book a ${this.vehicle.name} lesson`;
+    },
     instructorName(): string {
       return this.instructors.find(({slug}) => slug === this.instructorSlug)?.name ?? '';
     },
-    /** Whether the chosen time is too soon to cancel. */
+    /** Whether the chosen time is too soon to cancel or reschedule. */
     isFinal(): boolean {
       return this.startsAt !== null && !hasCancellationNotice(this.startsAt, new Date());
     },
@@ -148,6 +159,7 @@ export default defineComponent({
     void this.loadSlots();
   },
   methods: {
+    lessonDayAndTime,
     lessonTime,
     timeZoneName,
     async loadSlots() {
@@ -162,7 +174,9 @@ export default defineComponent({
       this.slots = [];
 
       try {
-        const slots = await api.listSlots(this.vehicle.slug, instructorSlug);
+        const slots = await (this.lesson
+          ? api.listRescheduleSlots(this.lesson.id, instructorSlug)
+          : api.listSlots(this.vehicle.slug, instructorSlug));
 
         // Another instructor may have been chosen meanwhile.
         if (instructorSlug === this.instructorSlug) {
@@ -177,7 +191,7 @@ export default defineComponent({
         }
       }
     },
-    async book() {
+    async save() {
       if (!this.startsAt) {
         return;
       }
@@ -186,14 +200,13 @@ export default defineComponent({
       this.errorMessage = '';
 
       try {
-        const booking = await this.bookingsStore.book({
-          vehicleSlug: this.vehicle.slug,
-          instructorSlug: this.instructorSlug,
-          startsAt: this.startsAt,
-        });
-        this.$emit('booked', booking);
+        const time = {instructorSlug: this.instructorSlug, startsAt: this.startsAt};
+        const booking = await (this.lesson
+          ? this.bookingsStore.reschedule(this.lesson.id, time)
+          : this.bookingsStore.book({vehicleSlug: this.vehicle.slug, ...time}));
+        this.$emit('saved', booking);
       } catch (error) {
-        this.errorMessage = error instanceof Error ? error.message : 'Could not book the lesson.';
+        this.errorMessage = error instanceof Error ? error.message : 'Could not save the lesson.';
         await this.refreshSlots();
       } finally {
         this.saving = false;

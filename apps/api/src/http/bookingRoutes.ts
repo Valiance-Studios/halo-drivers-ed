@@ -1,4 +1,4 @@
-import type {BookingRequest} from '@hde/shared';
+import type {BookingRequest, RescheduleRequest} from '@hde/shared';
 import type {BookingService} from '#src/bookings/bookingService.ts';
 import type {SignedInEnv} from '#src/http/signedIn.ts';
 
@@ -27,6 +27,16 @@ function parseBookingRequest(body: unknown): BookingRequest {
   return {vehicleSlug, instructorSlug, startsAt};
 }
 
+function parseRescheduleRequest(body: unknown): RescheduleRequest {
+  const {instructorSlug, startsAt} = (body ?? {}) as Record<string, unknown>;
+
+  if (typeof instructorSlug !== 'string' || typeof startsAt !== 'string' || Number.isNaN(Date.parse(startsAt))) {
+    throw new ApiError(400, 'invalid-request', 'Send an instructor and a start time.');
+  }
+
+  return {instructorSlug, startsAt};
+}
+
 /** The signed-in student's lessons, and the times they can book. */
 export function bookingRoutes(service: BookingService): Hono<SignedInEnv> {
   return new Hono<SignedInEnv>()
@@ -42,6 +52,16 @@ export function bookingRoutes(service: BookingService): Hono<SignedInEnv> {
       const {email, role} = c.var.me;
 
       return c.json(await service.book(email, request, role === 'guest' ? GUEST_LESSON_LIMIT : null), 201);
+    })
+    .get('/bookings/:id/slots', async (c) => {
+      const {instructor = ''} = c.req.query();
+
+      return c.json(await service.rescheduleSlots(c.var.me.email, lessonId(c.req.param('id')), instructor));
+    })
+    .post('/bookings/:id/reschedule', async (c) => {
+      const request = parseRescheduleRequest(await c.req.json().catch(() => null));
+
+      return c.json(await service.reschedule(c.var.me.email, lessonId(c.req.param('id')), request));
     })
     .post('/bookings/:id/cancel', async (c) => {
       return c.json(await service.cancel(c.var.me.email, lessonId(c.req.param('id'))));

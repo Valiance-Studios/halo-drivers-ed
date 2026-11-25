@@ -86,6 +86,22 @@ describe('time off', () => {
     expect(johnson.some(({startsAt}) => startsAt.startsWith('2026-06-09'))).toBe(true);
   });
 
+  it('cannot be rescheduled into, or missed by a lesson moving into it at the same time', async () => {
+    const {id} = await book(STUDENT, 9);
+    const move = (day: number) =>
+      errorCode(
+        bookingService.reschedule(STUDENT, id, {
+          instructorSlug: CHIEF,
+          startsAt: new Date(Date.UTC(2026, 5, day, 12)).toISOString(),
+        }),
+      );
+    await add('10', '10');
+    expect(await move(10)).toBe('slot-unavailable');
+
+    const [answer, code] = await Promise.all([add('11', '11'), move(11)]);
+    expect(answer.saved).toBe(code === 'slot-unavailable');
+  });
+
   it('is refused while lessons are booked in it, until each is cancelled with a reason', async () => {
     const [first, second] = [await book(STUDENT, 9), await book(OTHER, 10)];
     const outside = await book(STUDENT, 11);

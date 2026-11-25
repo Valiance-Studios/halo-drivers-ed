@@ -35,7 +35,10 @@ export interface BookingRequest {
   startsAt: string;
 }
 
-/** A time a lesson can be booked, from `GET /api/slots`. */
+/** The body of `POST /api/bookings/:id/reschedule`: the lesson's new time, and who teaches it then. */
+export type RescheduleRequest = Omit<BookingRequest, 'vehicleSlug'>;
+
+/** A time a lesson can be booked, from `GET /api/slots`, or moved to, from `GET /api/bookings/:id/slots`. */
 export interface LessonSlot {
   startsAt: string;
   endsAt: string;
@@ -44,15 +47,16 @@ export interface LessonSlot {
 /** How far ahead lessons can be booked. */
 export const BOOKING_WINDOW_DAYS = 14;
 
-/** Lessons can be cancelled until this long before they start. */
+/** Lessons can be cancelled or rescheduled until this long before they start. */
 export const CANCELLATION_NOTICE_HOURS = 24;
 
-/** Whether a lesson starts late enough to still be cancelled. */
+/** Whether a lesson starts late enough to still be cancelled or rescheduled. */
 export function hasCancellationNotice(startsAt: string, now: Date): boolean {
   return new Date(startsAt).getTime() - now.getTime() >= CANCELLATION_NOTICE_HOURS * 60 * 60 * 1000;
 }
 
-export function canCancel(booking: Booking, now: Date): boolean {
+/** Whether a student can still cancel or reschedule a lesson. */
+export function canChange(booking: Booking, now: Date): boolean {
   return booking.status === 'booked' && hasCancellationNotice(booking.startsAt, now);
 }
 

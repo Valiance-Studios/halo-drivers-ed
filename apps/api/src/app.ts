@@ -116,8 +116,8 @@ export function createApp({
     .use(rateLimit(rateLimits))
     .route('/', demoRoutes(demo))
     .use(requireAllowed)
-    .on('GET', ['/slots', '/admin/lessons'], clearExpiredDemos(demo))
-    .on('POST', ['/bookings', '/admin/instructors/:slug/time-off'], clearExpiredDemos(demo))
+    .on('GET', ['/slots', '/bookings/:id/slots', '/admin/lessons'], clearExpiredDemos(demo))
+    .on('POST', ['/bookings', '/bookings/:id/reschedule', '/admin/instructors/:slug/time-off'], clearExpiredDemos(demo))
     .get('/me', async (c) => {
       const {me, identity} = c.var;
 

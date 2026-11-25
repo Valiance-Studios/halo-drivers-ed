@@ -193,6 +193,101 @@ describe('BookingService', () => {
     expect(await errorCode(service.cancel(STUDENT, later.id))).toBe('too-late-to-cancel');
   });
 
+  describe('rescheduling', () => {
+    const to = (startsAt: Date, instructorSlug = 'master-chief') => ({
+      instructorSlug,
+      startsAt: startsAt.toISOString(),
+    });
+
+    it('moves a lesson, which frees its old time and takes the new one', async () => {
+      const {id} = await service.book(STUDENT, mongoose(at(9, 12)));
+
+      expect(await service.reschedule(STUDENT, id, to(at(10, 12)))).toMatchObject({
+        id,
+        instructorSlug: 'master-chief',
+        startsAt: '2026-06-10T12:00:00.000Z',
+        endsAt: '2026-06-10T12:45:00.000Z',
+        status: 'booked',
+      });
+      expect(await service.list(STUDENT)).toHaveLength(1);
+      expect(await errorCode(service.book(OTHER, mongoose(at(10, 12))))).toBe('slot-unavailable');
+      expect(await errorCode(service.book(OTHER, mongoose(at(9, 12))))).toBeUndefined();
+    });
+
+    it('can move to a time that overlaps the old one, but does not offer the old one', async () => {
+      const {id} = await service.book(STUDENT, mongoose(at(9, 12)));
+      const starts = (await service.rescheduleSlots(STUDENT, id, 'master-chief')).map(({startsAt}) => startsAt);
+
+      expect(starts).toContain('2026-06-09T12:30:00.000Z');
+      expect(starts).not.toContain('2026-06-09T12:00:00.000Z');
+      expect(await errorCode(service.reschedule(STUDENT, id, to(at(9, 12))))).toBe('slot-unavailable');
+      expect(await errorCode(service.reschedule(STUDENT, id, to(at(9, 12, 30))))).toBeUndefined();
+    });
+
+    it('can change the instructor, to one who teaches the course', async () => {
+      const {id} = await service.book(STUDENT, mongoose(at(9, 12)));
+      const [slot] = await service.rescheduleSlots(STUDENT, id, 'sergeant-johnson');
+      const startsAt = new Date(slot?.startsAt ?? '');
+
+      expect(await service.reschedule(STUDENT, id, to(startsAt, 'sergeant-johnson'))).toMatchObject({
+        instructorSlug: 'sergeant-johnson',
+        ...slot,
+      });
+      expect(await errorCode(service.rescheduleSlots(STUDENT, id, 'arbiter'))).toBe('invalid-request');
+    });
+
+    it('keeps the old time when the new one is taken', async () => {
+      const {id, startsAt} = await service.book(STUDENT, mongoose(at(9, 12)));
+      await service.book(OTHER, mongoose(at(10, 12)));
+
+      expect(await errorCode(service.reschedule(STUDENT, id, to(at(10, 12))))).toBe('slot-unavailable');
+      expect(await service.list(STUDENT)).toMatchObject([{id, startsAt, status: 'booked'}]);
+    });
+
+    it('gives one time to only one of two students who move to it together', async () => {
+      const own = await service.book(STUDENT, mongoose(at(9, 12)));
+      const other = await service.book(OTHER, mongoose(at(10, 12)));
+      const codes = await Promise.all([
+        errorCode(service.reschedule(STUDENT, own.id, to(at(11, 12)))),
+        errorCode(service.reschedule(OTHER, other.id, to(at(11, 12)))),
+      ]);
+
+      expect(codes).toContain('slot-unavailable');
+      expect(codes).toContain(undefined);
+      expect(await service.list(STUDENT)).toHaveLength(1);
+      expect(await service.list(OTHER)).toHaveLength(1);
+    });
+
+    it('does not count against the lessons a course has', async () => {
+      const {id} = await service.book(STUDENT, mongoose(at(9, 12)));
+      await service.book(STUDENT, mongoose(at(10, 12)));
+
+      expect(await errorCode(service.reschedule(STUDENT, id, to(at(11, 12))))).toBeUndefined();
+    });
+
+    it("refuses late, cancelled, and other students' lessons", async () => {
+      const soon = await service.book(STUDENT, mongoose(at(8, 12)));
+      const later = await service.book(STUDENT, mongoose(at(10, 12)));
+      const move = (email: string, id: string) => errorCode(service.reschedule(email, id, to(at(11, 12))));
+
+      expect(await move(STUDENT, soon.id)).toBe('too-late-to-reschedule');
+      expect(await move(OTHER, later.id)).toBe('not-found');
+      expect(await errorCode(service.rescheduleSlots(OTHER, later.id, 'master-chief'))).toBe('not-found');
+      await service.cancel(STUDENT, later.id);
+      expect(await move(STUDENT, later.id)).toBe('too-late-to-reschedule');
+    });
+
+    it('never brings back a lesson cancelled at the same time', async () => {
+      const {id} = await service.book(STUDENT, mongoose(at(9, 12)));
+      await Promise.all([
+        errorCode(service.reschedule(STUDENT, id, to(at(10, 12)))),
+        errorCode(service.cancel(STUDENT, id)),
+      ]);
+
+      expect(await service.list(STUDENT)).toMatchObject([{id, status: 'cancelled'}]);
+    });
+  });
+
   it("lists only the student's own lessons", async () => {
     await service.book(STUDENT, mongoose(at(9, 12)));
 
