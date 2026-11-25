@@ -521,7 +521,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - Course progress on the route map and in the vehicle's panel, and repeats before the next lesson.
 - Booking: instructor hours, lesson times, booking and cancelling, My lessons, and exclusion constraints against double-booking.
 - Lesson plans (53 lessons), instructors' lesson forms, sign-off that unlocks courses, notes and student history (deployed and tried on the site on 2026-11-24), and admins' schedule with View As. Demo guests have the same for their own lessons. Deployed and tried on the site on 2026-11-24.
-- Instructors' [time off](#time-off), and cancelling lessons on their behalf.
+- Instructors' [time off](#time-off), and cancelling lessons on their behalf. Deployed and tried on the site on 2026-11-24.
 - A `student` role, which can book but not sign off.
 - [Demo](#demo) slots for recruiters: 10 at once, 2 hours each. Deployed and tried on the site on 2026-11-24, including that signing out removes the anonymous account.
 - UNSC and Covenant themes, each light and dark, with placeholder artwork.
@@ -533,7 +533,6 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### To Check
 
-- Time off and cancelling on an instructor's behalf are not deployed. Deploy the API, then the site, and try both.
 - The prompt when leaving a lesson form with unsaved marks has no test.
 - Accounts allowlisted before the `student` role existed are admins, who can sign off everyone's lessons. Change others with `npm run db:allow -- <email> student`.
 
