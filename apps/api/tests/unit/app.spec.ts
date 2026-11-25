@@ -1,7 +1,8 @@
-import type {Booking, CourseLesson, Instructor, Role, Vehicle} from '@hde/shared';
+import type {AllowlistRole, Booking, CourseLesson, Instructor, Vehicle} from '@hde/shared';
 import type {AppDependencies} from '#src/app.ts';
 import type {TokenVerifier} from '#src/auth/tokenVerifier.ts';
 import type {BookingRepository} from '#src/repositories/bookingRepository.ts';
+import type {DemoRepository} from '#src/repositories/demoRepository.ts';
 import type {LessonRepository} from '#src/repositories/lessonRepository.ts';
 
 import {describe, expect, it, vi} from 'vite-plus/test';
@@ -68,16 +69,17 @@ const lessonRepository: LessonRepository = {
   update: async () => null,
 };
 
-/** Accepts the ID token "valid-<email>" and the App Check token "app". */
+/** Accepts the ID token "valid-<email>" ("valid-guest" is anonymous) and the App Check token "app". */
 const verifier: TokenVerifier = {
   async verifyIdToken(token) {
     if (!token.startsWith('valid-')) {
       throw new Error('bad token');
     }
 
-    const email = token.slice('valid-'.length);
+    const name = token.slice('valid-'.length);
+    const isAnonymous = name === 'guest';
 
-    return {uid: `uid-${email}`, email, displayName: 'Pat'};
+    return {uid: `uid-${name}`, email: isAnonymous ? null : name, isAnonymous, displayName: isAnonymous ? null : 'Pat'};
   },
   async verifyAppCheckToken(token) {
     if (token !== 'app') {
@@ -86,8 +88,15 @@ const verifier: TokenVerifier = {
   },
 };
 
+const demo: DemoRepository = {
+  findGuest: async () => ({email: 'guest-1@demo.invalid', role: 'guest', demoEndsAt: '2026-06-09T12:00:00.000Z'}),
+  claim: async () => ({claimed: true, endsAt: '2026-06-09T12:00:00.000Z'}),
+  release: async () => {},
+  clearExpired: async () => {},
+};
+
 function makeApp(overrides: Partial<AppDependencies> = {}) {
-  const roles: Record<string, Role> = {'pat@example.com': 'admin', 'sam@example.com': 'student'};
+  const roles: Record<string, AllowlistRole> = {'pat@example.com': 'admin', 'sam@example.com': 'student'};
 
   return createApp({
     appCheck: 'required',
@@ -97,6 +106,7 @@ function makeApp(overrides: Partial<AppDependencies> = {}) {
       rememberName: async () => {},
     },
     catalog,
+    demo,
     bookings: new BookingService(bookingRepository, catalog),
     lessons: new LessonService(lessonRepository, catalog),
     ...overrides,
@@ -120,7 +130,7 @@ describe('API', () => {
   it('returns the signed-in account with its email lowercased', async () => {
     const response = await get(makeApp(), '/api/me', SIGNED_IN);
 
-    expect(await response.json()).toEqual({email: 'pat@example.com', role: 'admin'});
+    expect(await response.json()).toEqual({email: 'pat@example.com', role: 'admin', demoEndsAt: null});
   });
 
   it('serves the catalog to allowlisted accounts', async () => {
@@ -236,7 +246,12 @@ describe('API', () => {
 
   it('rejects an account without a verified email', async () => {
     const response = await get(
-      makeApp({verifier: {...verifier, verifyIdToken: async () => ({uid: 'uid', email: null, displayName: null})}}),
+      makeApp({
+        verifier: {
+          ...verifier,
+          verifyIdToken: async () => ({uid: 'uid', email: null, isAnonymous: false, displayName: null}),
+        },
+      }),
       '/api/me',
       SIGNED_IN,
     );
@@ -258,6 +273,47 @@ describe('API', () => {
 
     expect(response.status).toBe(413);
     expect(await response.json()).toMatchObject({error: {code: 'request-too-large'}});
+  });
+
+  describe('demo', () => {
+    const GUEST = {...SIGNED_IN, Authorization: 'Bearer valid-guest'};
+
+    it('lets a guest in, but not as an admin', async () => {
+      expect(await (await get(makeApp(), '/api/me', GUEST)).json()).toMatchObject({role: 'guest'});
+      expect((await get(makeApp(), '/api/admin/lessons', GUEST)).status).toBe(403);
+    });
+
+    it('turns a guest away once their session ends, but lets them start another', async () => {
+      const app = makeApp({demo: {...demo, findGuest: async () => null}});
+      const response = await get(app, '/api/vehicles', GUEST);
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({error: {code: 'demo-ended'}});
+      expect((await app.request('/api/demo-sessions', {method: 'POST', headers: GUEST})).status).toBe(200);
+    });
+
+    it.each(['POST', 'DELETE'])('refuses %s from accounts that are not anonymous', async (method) => {
+      const response = await makeApp().request('/api/demo-sessions', {method, headers: SIGNED_IN});
+
+      expect(response.status).toBe(403);
+    });
+
+    it.each([
+      ['GET', '/api/slots'],
+      ['POST', '/api/bookings'],
+      ['GET', '/api/admin/lessons'],
+    ])('clears expired guests before %s %s', async (method, path) => {
+      const clearExpired = vi.fn(async () => {});
+      await makeApp({demo: {...demo, clearExpired}}).request(path, {method, headers: SIGNED_IN});
+
+      expect(clearExpired).toHaveBeenCalledTimes(1);
+    });
+
+    it('needs an App Check token to start one', async () => {
+      const headers = {Authorization: GUEST.Authorization};
+
+      expect((await makeApp().request('/api/demo-sessions', {method: 'POST', headers})).status).toBe(401);
+    });
   });
 
   describe('rate limits', () => {

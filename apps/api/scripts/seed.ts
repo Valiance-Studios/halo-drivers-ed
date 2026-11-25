@@ -4,7 +4,7 @@
  * Usage: npm run db:seed   (local database; for Neon, set DATABASE_URL in the shell first)
  */
 import {connect} from '#src/db/client.ts';
-import {seedCatalog} from '#src/db/seed.ts';
+import {seedCatalog, seedDemoSlots} from '#src/db/seed.ts';
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -16,6 +16,7 @@ const {db, close} = connect(databaseUrl, 1);
 
 try {
   await seedCatalog(db);
+  await seedDemoSlots(db);
   console.log('Catalog seeded.');
 } finally {
   await close();

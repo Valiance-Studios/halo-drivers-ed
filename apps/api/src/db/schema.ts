@@ -101,7 +101,10 @@ export const instructorVehicles = pgTable(
   ],
 );
 
-/** The accounts allowed to sign in. Emails are stored lowercase, so lookups need no case folding. */
+/**
+ * The accounts allowed to sign in, and demo guests while their session lasts, whose made-up addresses are ones
+ * no real account can have. Emails are stored lowercase, so lookups need no case folding.
+ */
 export const allowedUsers = pgTable(
   'allowed_users',
   {
@@ -111,7 +114,29 @@ export const allowedUsers = pgTable(
     role: roleEnum().notNull(),
     createdAt: timestamp({withTimezone: true}).notNull().defaultNow(),
   },
-  (table) => [check('allowed_users_email_lowercase', sql`${table.email} = lower(${table.email})`)],
+  (table) => [
+    check('allowed_users_email_lowercase', sql`${table.email} = lower(${table.email})`),
+    // As text, since a migration cannot use an enum value it adds in the same transaction.
+    check('allowed_users_guest_email', sql`(${table.role}::text = 'guest') = (${table.email} like '%@demo.invalid')`),
+  ],
+);
+
+/** One row for each visitor who can try the demo at once. A row whose session has expired is free to reuse. */
+export const demoSlots = pgTable(
+  'demo_slots',
+  {
+    id: integer().primaryKey(),
+    /** The anonymous Firebase account in the slot. */
+    uid: text().unique(),
+    guestEmail: text()
+      .unique()
+      .references(() => allowedUsers.email),
+    expiresAt: timestamp({withTimezone: true}),
+  },
+  (table) => [
+    check('demo_slots_id_positive', sql`${table.id} > 0`),
+    check('demo_slots_session', sql`num_nonnulls(${table.uid}, ${table.guestEmail}, ${table.expiresAt}) in (0, 3)`),
+  ],
 );
 
 /** Each instructor's weekly hours, as wall-clock times in the school's time zone (see lessonSlots.ts). */

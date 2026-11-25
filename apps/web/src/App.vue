@@ -67,6 +67,12 @@
       </div>
     </header>
     <main class="app__main">
+      <Message
+        v-if="demoNotice"
+        severity="info"
+      >
+        {{ demoNotice }}
+      </Message>
       <RouterView />
     </main>
   </div>
@@ -86,6 +92,13 @@ export default defineComponent({
   components: {FactionToggle, ThemeToggle},
   computed: {
     ...mapStores(useAuthStore, useBookingsStore, useViewAsStore),
+    demoNotice(): string {
+      const endsAt = this.authStore.user?.demoEndsAt;
+
+      return endsAt
+        ? `You are trying the demo until ${new Date(endsAt).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'})}. You cannot return to it after that, or after signing out.`
+        : '';
+    },
   },
   watch: {
     /** Forgets one account's lessons and view before another signs in. */

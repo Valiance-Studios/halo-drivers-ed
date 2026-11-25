@@ -7,7 +7,7 @@
  */
 import {connect} from '#src/db/client.ts';
 import {runMigrations} from '#src/db/migrations.ts';
-import {seedCatalog} from '#src/db/seed.ts';
+import {seedCatalog, seedDemoSlots} from '#src/db/seed.ts';
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -20,6 +20,7 @@ const {db, close} = connect(databaseUrl, 1);
 try {
   await runMigrations(db);
   await seedCatalog(db);
+  await seedDemoSlots(db);
   console.log('Migrations applied and catalog seeded.');
 } finally {
   await close();

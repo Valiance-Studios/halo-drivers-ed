@@ -5,6 +5,7 @@ import type {
   Booking,
   BookingRequest,
   CourseLesson,
+  DemoSession,
   Instructor,
   LessonForm,
   LessonSignOff,
@@ -52,6 +53,15 @@ export class ApiClient {
 
   getMe(): Promise<Me> {
     return this.get('/me');
+  }
+
+  /** For anonymous accounts: starts a demo if there is room. */
+  startDemo(): Promise<DemoSession> {
+    return this.post('/demo-sessions');
+  }
+
+  async endDemo(): Promise<void> {
+    await this.send('/demo-sessions', {method: 'DELETE'});
   }
 
   listVehicles(): Promise<Vehicle[]> {

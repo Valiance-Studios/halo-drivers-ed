@@ -3,6 +3,7 @@ import type {BookingService} from '#src/bookings/bookingService.ts';
 import type {SignedInEnv} from '#src/http/signedIn.ts';
 
 import {Hono} from 'hono';
+import {DEMO_BOOKING_LIMIT} from '@hde/shared';
 import {ApiError} from '#src/http/errors.ts';
 import {lessonId} from '#src/http/lessonId.ts';
 
@@ -34,7 +35,9 @@ export function bookingRoutes(service: BookingService): Hono<SignedInEnv> {
     .post('/bookings', async (c) => {
       const request = parseBookingRequest(await c.req.json().catch(() => null));
 
-      return c.json(await service.book(c.var.me.email, request), 201);
+      const {email, role} = c.var.me;
+
+      return c.json(await service.book(email, request, role === 'guest' ? DEMO_BOOKING_LIMIT : null), 201);
     })
     .post('/bookings/:id/cancel', async (c) => {
       return c.json(await service.cancel(c.var.me.email, lessonId(c.req.param('id'))));
