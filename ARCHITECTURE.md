@@ -1,6 +1,6 @@
 # Halo Drivers Ed Architecture
 
-How the app is put together, and the main handoff document between sessions. Current status and what comes next are under [Project Status](#project-status).
+How the app is put together, and where it stands. Current status and what comes next are under [Project Status](#project-status).
 
 ## Documentation Map
 
@@ -58,11 +58,11 @@ flowchart LR
 - **Web**: Vue 3 (Options API) + TypeScript, PrimeVue 4 (Aura, colored by the app's [theme tokens](#theming); components auto-imported), Pinia, Vue Router, SCSS with BEM class names, self-hosted fonts (Fontsource), Vite (through Vite+).
 - **API**: Node 26 + TypeScript, Hono on `@hono/node-server`, Drizzle ORM and drizzle-kit migrations, `pg`, Firebase Admin SDK (token verification only). Run from source with Node's type stripping in development; bundled with esbuild for the container.
 - **Shared**: the API's request and response types and constants, and the booking rules both apps apply (`@hde/shared`), imported as TypeScript source by both apps.
-- **Data**: PostgreSQL 18; Neon in production, Docker Compose locally.
+- **Data**: PostgreSQL 18; Neon when deployed, Docker Compose locally.
 - **Tests**: Vitest (unit, and database tests against local Postgres), Playwright (E2E against the Auth emulator, a local API and the database).
 - **Tooling**: Vite+ (`vite-plus`), which bundles Vite, Vitest, Oxlint and Oxfmt; configured in the root `vite.config.ts` and `apps/web/vite.config.ts`. ESLint runs only `eslint-plugin-vue`, on Vue components.
 
-TypeScript is pinned to 6.x: TypeScript 7 (native compiler) does not expose the JS compiler API `vue-tsc` needs.
+Versions held back, and why, are under [Dependency Decisions](docs/DEVELOPMENT.md#dependency-decisions).
 
 ### Why These Choices
 
@@ -163,11 +163,20 @@ sequenceDiagram
 
 - An email counts only if the token says it is verified (`toVerifiedUser`). Otherwise, if email/password sign-in were ever enabled, someone could register an allowlisted address.
 - Each account may make 240 requests a minute, 60 of them writes (`DEFAULT_RATE_LIMITS`). The counts are in memory, so with up to 2 Cloud Run instances an account could get twice that. They come before the allowlist query, so a stranger's account cannot load the database either.
+- Responses are sent with `Cache-Control: private, no-store`, since they hold personal data.
 - An ID token stays valid for up to an hour after sign-out, accepted because removing an account from the allowlist takes effect at once.
 
 `APP_CHECK=off` exists only for the emulators. `loadConfig` refuses to start on Cloud Run (`K_SERVICE` set) with App Check off or with `FIREBASE_AUTH_EMULATOR_HOST` set, since either would let anyone in.
 
-On the web side, `stores/auth.ts` calls `GET /api/me` after each Google sign-in. A `not-allowed` answer signs the account out with a message on the login page; other failures keep it signed in so a retry can succeed. The popup and the auth listener share one check.
+On the web side, `stores/auth.ts` calls `GET /api/me` after each sign-in, and first claims a [demo](#demo) slot when one was asked for. A `not-allowed` answer signs the account out with a message on the login page; other failures keep it signed in so a retry can succeed. The popup and the auth listener share one check.
+
+### Known Limits
+
+The design does not rely on the code being private. What an attacker who has read it can still do:
+
+- **Use up the demo.** App Check raises the cost but does not stop a real browser from signing in anonymously again and again, which can take all the slots or, briefly, instructors' free times. Guests never see or change anyone else's data, and theirs is deleted.
+- **Slow the API down.** Rate limits are per account, so requests without a valid token are refused before any query but still use CPU. Two instances at most caps the cost, not the disruption.
+- **Replay an App Check token** outside a browser until it expires, as with any such token. The ID token, the allowlist and the rate limits still apply.
 
 ## Security Headers
 
@@ -231,7 +240,7 @@ sequenceDiagram
     Note right of S: not offered: 409 slot-unavailable
     S->>R: reschedule(time, check)
     R->>P: BEGIN, SELECT allowed_users FOR UPDATE
-    R->>P: SELECT the lesson FOR UPDATE
+    R->>P: SELECT the lesson
     R->>S: check(lesson)
     Note right of S: 404 not-found, or<br/>409 too-late-to-reschedule
     R->>P: SELECT the new instructor FOR SHARE, and time off
@@ -345,7 +354,7 @@ stateDiagram-v2
 - **History.** An instructor's form has the student's earlier signed-off lessons in the course, with results and notes. The student's own results (`GET /api/results`) are shown in the courses page's lesson plan.
 - Lessons in a course are signed off in order, and one can be corrected until a later one is signed off.
 - A correction is refused if it would lock a course the student has lessons in, or leave them with more lessons than the course has.
-- `PostgresLessonRepository.update` takes the same lock on the student's `allowed_users` row as booking does, so neither can change what the other decided on.
+- `PostgresLessonRepository.update` takes the same lock on the student's `allowed_users` row as booking, rescheduling and cancelling do, so none can change what another decided on.
 
 ## Certificates
 
@@ -510,18 +519,18 @@ erDiagram
 flowchart LR
     dev([npm run deploy:api]) --> build["Cloud Build<br/>apps/api/Dockerfile"]
     build --> registry[("Artifact Registry<br/>hde/api:commit")]
-    registry --> job["Cloud Run job hde-migrate<br/>node dist/release.js<br/>(migrate, seed catalog)"]
+    registry --> job["Cloud Run job hde-migrate<br/>node dist/release.js<br/>(migrate, seed)"]
     job -- "succeeded" --> service["Cloud Run service hde-api<br/>node dist/server.js"]
     web([npm run deploy:web]) --> check["check-firebase-config.ts<br/>staging"]
     check --> vite["vp build --mode staging"]
     vite --> hosting["Firebase Hosting"]
 ```
 
-One image holds both entry points. Migrations and the catalog seed run as their own job, with an owner database role, before the service rolls out; the service uses a role that can only read and write rows. Details and the one-time setup are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+One image holds both entry points. Migrations and the seed of the catalog and demo slots run as their own job, with an owner database role, before the service rolls out; the service uses a role that can only read and write rows. Details and the one-time setup are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Planned Design
 
-Nothing is agreed and waiting to be built.
+Nothing is agreed and waiting to be built, apart from [final artwork](#next-features).
 
 ### Ideas, Not Planned
 
@@ -558,11 +567,13 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - Locks on courses whose prerequisites are not complete, enforced by the API.
 - Course progress on the route map and in the vehicle's panel, and repeats before the next lesson.
 - Booking: instructor hours, lesson times, booking and cancelling, My lessons, and exclusion constraints against double-booking.
-- Lesson plans (53 lessons), instructors' lesson forms, sign-off that unlocks courses, notes and student history (deployed and tried on the site on 2026-11-24), and admins' schedule with View As. Demo guests have the same for their own lessons. Deployed and tried on the site on 2026-11-24.
+- Lesson plans (53 lessons), instructors' lesson forms, sign-off that unlocks courses, notes and student history, and admins' schedule with View As. Demo guests have the same for their own lessons. Deployed and tried on the site on 2026-11-24.
 - Instructors' [time off](#time-off), and cancelling lessons on their behalf. Deployed and tried on the site on 2026-11-24.
 - `npm run db:clear`, to delete everyone's, a student's or an instructor's data.
 - [Rescheduling](#booking) a lesson. Deployed and tried on the site on 2026-11-24.
-- [Certificates](#certificates) for completed courses, and a Ghost lesson in guests' history. Not deployed yet.
+- [Certificates](#certificates) for completed courses, and a Ghost lesson in guests' history. Deployed on 2026-11-24.
+- A lesson can no longer be cancelled and signed off at the same time, and API responses are not cached. Not deployed yet.
+- A menu for the app bar on narrow screens, and a footer notice. Not deployed yet.
 - A `student` role, which can book but not sign off.
 - [Demo](#demo) slots for recruiters: 10 at once, 2 hours each. Deployed and tried on the site on 2026-11-24, including that signing out removes the anonymous account.
 - UNSC and Covenant themes, each light and dark, with placeholder artwork.
@@ -574,13 +585,12 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### To Check
 
-- The prompt when leaving a lesson form with unsaved marks has no test.
 - Accounts allowlisted before the `student` role existed are admins, who can sign off everyone's lessons. Change others with `npm run db:allow -- <email> student`.
 
 ### Next: Decisions (need the owner)
 
 1. PrimeVue 5 (see [Dependency Decisions](docs/DEVELOPMENT.md#dependency-decisions)).
-2. The repository's visibility (private for now).
+2. The repository's visibility (private for now). Its history, pull requests and files were reviewed on 2026-11-24 and hold no secrets, and the backend and its GCP settings were reviewed for an attacker who has the code ([Known Limits](#known-limits)). The code is under the MIT License. Once public, turn on secret scanning with push protection, branch protection for `main`, and approval for outside contributors' CI runs.
 
 ### Next: Features
 

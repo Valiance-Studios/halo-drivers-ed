@@ -138,6 +138,11 @@ export function createApp({
 
   const app = new Hono();
 
+  app.use('/api/*', async (c, next) => {
+    // Responses hold personal data. Set first, so that errors have it too.
+    c.header('Cache-Control', 'private, no-store');
+    await next();
+  });
   app.use('/api/*', limitBody);
   app.get('/api/health', (c) => c.json({status: 'ok'}));
   app.route('/api', signedIn);

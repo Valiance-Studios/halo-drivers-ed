@@ -7,9 +7,11 @@ import {BookingService} from '#src/bookings/bookingService.ts';
 import {connect} from '#src/db/client.ts';
 import {bookings, instructorAvailability} from '#src/db/schema.ts';
 import {seedCatalog} from '#src/db/seed.ts';
+import {LessonService} from '#src/lessons/lessonService.ts';
 import {PostgresAllowlistRepository} from '#src/repositories/allowlistRepository.ts';
 import {PostgresBookingRepository} from '#src/repositories/bookingRepository.ts';
 import {PostgresCatalogRepository} from '#src/repositories/catalogRepository.ts';
+import {PostgresLessonRepository} from '#src/repositories/lessonRepository.ts';
 import {TEST_DATABASE_URL} from './database.ts';
 
 const {db, close} = connect(TEST_DATABASE_URL, 5);
@@ -181,6 +183,27 @@ describe('BookingService', () => {
 
     expect(await service.cancel(STUDENT, id)).toMatchObject({id, status: 'cancelled'});
     expect(await errorCode(service.book(OTHER, mongoose(at(9, 12))))).toBeUndefined();
+  });
+
+  it('never both cancels a lesson and signs it off', async () => {
+    const lessons = new LessonService(new PostgresLessonRepository(db), new PostgresCatalogRepository(db), () => NOW);
+    const signOff = {
+      results: {},
+      notes: {student: '', private: ''},
+      attendance: 'missed' as const,
+      early: true,
+    };
+
+    for (let round = 0; round < 30; round++) {
+      await db.delete(bookings);
+      const {id} = await service.book(STUDENT, mongoose(at(9, 12)));
+      const codes = await Promise.all([
+        errorCode(lessons.signOff(id, signOff, OTHER, null)),
+        errorCode(service.cancel(STUDENT, id)),
+      ]);
+
+      expect(codes.filter((code) => code === undefined)).toHaveLength(1);
+    }
   });
 
   it("refuses to cancel late, twice, or another student's lesson", async () => {

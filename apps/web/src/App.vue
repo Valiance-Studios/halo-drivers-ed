@@ -1,6 +1,10 @@
 <template>
   <div class="app">
-    <header class="app__header">
+    <header
+      ref="header"
+      class="app__header"
+      @keydown.esc="closeMenu"
+    >
       <div class="app__bar">
         <RouterLink
           class="app__title"
@@ -27,7 +31,10 @@
         </RouterLink>
         <nav
           v-if="authStore.isAllowed"
+          id="app-menu"
+          ref="menu"
           class="app__nav"
+          :class="{'app__nav--open': menuOpen}"
           aria-label="Main"
         >
           <RouterLink
@@ -49,6 +56,16 @@
           >
             Schedule
           </RouterLink>
+          <div class="app__menu-account">
+            <span>{{ authStore.user?.displayName }}</span>
+            <Button
+              label="Sign out"
+              icon="pi pi-sign-out"
+              severity="secondary"
+              text
+              @click="signOut"
+            />
+          </div>
         </nav>
         <div class="app__actions">
           <FactionToggle />
@@ -56,11 +73,24 @@
           <template v-if="authStore.isAllowed">
             <span class="app__user">{{ authStore.user?.displayName }}</span>
             <Button
+              class="app__sign-out"
               label="Sign out"
               icon="pi pi-sign-out"
               severity="secondary"
               text
               @click="signOut"
+            />
+            <Button
+              ref="menuButton"
+              class="app__menu-button"
+              :icon="menuOpen ? 'pi pi-times' : 'pi pi-bars'"
+              severity="secondary"
+              text
+              rounded
+              aria-label="Menu"
+              aria-controls="app-menu"
+              :aria-expanded="menuOpen"
+              @click="toggleMenu"
             />
           </template>
         </div>
@@ -76,10 +106,16 @@
       </Message>
       <RouterView />
     </main>
+    <footer class="app__footer">
+      A non-commercial fan project, not affiliated with or endorsed by Microsoft. Halo and its characters belong to
+      Microsoft.
+    </footer>
   </div>
 </template>
 
 <script lang="ts">
+import type {ComponentPublicInstance} from 'vue';
+
 import {defineComponent} from 'vue';
 import {mapStores} from 'pinia';
 import {useAuthStore} from '@/stores/auth';
@@ -91,6 +127,10 @@ import ThemeToggle from '@/components/ThemeToggle.vue';
 export default defineComponent({
   name: 'App',
   components: {FactionToggle, ThemeToggle},
+  data() {
+    /** Whether the narrow screens' menu is open. */
+    return {menuOpen: false};
+  },
   computed: {
     ...mapStores(useAuthStore, useBookingsStore, useViewAsStore),
     demoNotice(): string {
@@ -107,14 +147,44 @@ export default defineComponent({
       this.bookingsStore.$reset();
       this.viewAsStore.$reset();
     },
+    '$route'() {
+      this.menuOpen = false;
+    },
     'authStore.isAllowed'(isAllowed: boolean) {
       if (!isAllowed && !this.$route.meta.public) {
         void this.$router.push({name: 'login'});
       }
     },
   },
+  mounted() {
+    document.addEventListener('pointerdown', this.closeMenuOutside);
+  },
+  beforeUnmount() {
+    document.removeEventListener('pointerdown', this.closeMenuOutside);
+  },
   methods: {
+    /** Opening moves the focus into the menu, which comes before its button. */
+    async toggleMenu() {
+      this.menuOpen = !this.menuOpen;
+
+      if (this.menuOpen) {
+        await this.$nextTick();
+        (this.$refs.menu as HTMLElement | undefined)?.querySelector('a')?.focus();
+      }
+    },
+    closeMenu() {
+      if (this.menuOpen) {
+        this.menuOpen = false;
+        (this.$refs.menuButton as ComponentPublicInstance | undefined)?.$el.focus();
+      }
+    },
+    closeMenuOutside({target}: PointerEvent) {
+      if (!(this.$refs.header as HTMLElement).contains(target as Node)) {
+        this.menuOpen = false;
+      }
+    },
     async signOut() {
+      this.menuOpen = false;
       await this.authStore.signOut();
     },
   },
@@ -123,6 +193,8 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .app {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
 
   &__header {
@@ -186,9 +258,16 @@ export default defineComponent({
     margin-left: 1rem;
 
     @media (max-width: 52rem) {
+      display: none;
+      flex-direction: column;
+      gap: 0;
       order: 1;
       width: 100%;
       margin: 0;
+
+      &--open {
+        display: flex;
+      }
     }
   }
 
@@ -197,6 +276,12 @@ export default defineComponent({
     border-bottom: 3px solid transparent;
     color: inherit;
     text-decoration: none;
+
+    @media (max-width: 52rem) {
+      padding: 0.625rem 0.75rem;
+      border-bottom: 0;
+      border-left: 3px solid transparent;
+    }
 
     &:hover,
     &.router-link-active {
@@ -223,20 +308,90 @@ export default defineComponent({
     gap: 0.5rem;
   }
 
-  &__user {
+  &__user,
+  &__sign-out {
     @media (max-width: 52rem) {
+      display: none;
+    }
+  }
+
+  &__menu-account,
+  &__menu-button {
+    display: none;
+  }
+
+  &__menu-account {
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.5rem;
+    padding: 0.5rem 0 0 0.75rem;
+    border-top: 1px solid rgb(255 255 255 / 30%);
+    overflow-wrap: anywhere;
+
+    :deep(.p-button) {
+      flex: none;
+    }
+  }
+
+  @media (max-width: 52rem) {
+    &__menu-account {
+      display: flex;
+    }
+
+    &__menu-button {
+      display: inline-flex;
+    }
+
+    &__title {
+      gap: 0.5rem;
+      font-size: 1.25rem;
+      white-space: nowrap;
+    }
+
+    &__mark {
+      width: 1.75rem;
+      height: 1.75rem;
+    }
+  }
+
+  // Keeps the app bar on one line on the smallest phones.
+  @media (max-width: 23.5rem) {
+    &__bar {
+      column-gap: 0.5rem;
+    }
+
+    &__actions {
+      gap: 0.125rem;
+    }
+
+    &__title {
+      font-size: 1.0625rem;
+    }
+
+    &__mark {
       display: none;
     }
   }
 
   @media print {
     &__header,
+    &__footer,
     &__notice {
       display: none;
     }
   }
 
+  &__footer {
+    padding: 1rem var(--app-gutter);
+    border-top: 1px solid var(--app-line);
+    color: var(--app-muted);
+    font-size: 0.875rem;
+    text-align: center;
+  }
+
   &__main {
+    flex: 1;
+    width: 100%;
     max-width: var(--app-max-width);
     margin: 0 auto;
     padding: var(--app-gutter) var(--app-gutter) 3rem;
