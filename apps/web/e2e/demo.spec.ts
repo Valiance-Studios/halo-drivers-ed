@@ -12,7 +12,7 @@ test('lets a visitor try the demo, and deletes it when they sign out', async ({p
   await page.reload();
   await page.getByRole('link', {name: 'My lessons'}).click();
   const results = page.getByRole('button', {name: 'See results'});
-  await expect(results).toHaveCount(3);
+  await expect(results).toHaveCount(6);
 
   // Admins see guests' lessons only if they ask to.
   const adminContext = await browser.newContext();
@@ -24,7 +24,7 @@ test('lets a visitor try the demo, and deletes it when they sign out', async ({p
   await expect(admin.getByLabel('Show demo guests')).toBeVisible();
   await expect(guestLessons).toHaveCount(0);
   await admin.getByLabel('Show demo guests').check();
-  await expect(guestLessons).toHaveCount(3);
+  await expect(guestLessons).toHaveCount(6);
   await adminContext.close();
 
   const ended = page.waitForResponse((response) => response.request().method() === 'DELETE');
@@ -33,37 +33,35 @@ test('lets a visitor try the demo, and deletes it when they sign out', async ({p
   await expect(page).toHaveURL(/\/login/);
 });
 
-test('lets a visitor sign off their own lessons, which unlocks a course', async ({page}) => {
-  test.slow();
+test('lets a visitor sign off a lesson, which unlocks the Scorpion and the Hornet', async ({page}) => {
   await page.goto('/login');
   await page.getByRole('button', {name: 'Try the demo'}).click();
+  await page.getByRole('button', {name: /^Scorpion/}).click();
+  await expect(page.getByRole('button', {name: 'Book Scorpion lesson'})).toBeDisabled();
 
-  // The Warthog course has four lessons.
-  for (let number = 1; number <= 4; number++) {
-    await page.getByRole('link', {name: 'Courses', exact: true}).click();
-    await page.getByRole('button', {name: /^Warthog/}).click();
-    await bookLesson(page, 'Warthog');
+  // Guests start with the other three Warthog lessons completed.
+  await page.getByRole('button', {name: /^Warthog/}).click();
+  await bookLesson(page, 'Warthog');
+  await page.getByRole('link', {name: 'Schedule', exact: true}).click();
+  await expect(page.getByText(/These are your own lessons/)).toBeVisible();
+  await page.getByRole('link', {name: 'View form'}).first().click();
+  await expect(page.getByRole('heading', {name: 'Warthog, lesson 4'})).toBeVisible();
+  await page.getByLabel('Mark and sign off early').check();
 
-    await page.getByRole('link', {name: 'Schedule', exact: true}).click();
-    await expect(page.getByText(/These are your own lessons/)).toBeVisible();
-    await page.getByRole('link', {name: 'View form'}).first().click();
-    await expect(page.getByRole('heading', {name: `Warthog, lesson ${number}`})).toBeVisible();
-    await page.getByLabel('Mark and sign off early').check();
-
-    // Skills passed in the lesson to repeat are passed already.
-    for (const pass of await page.getByRole('button', {name: 'Pass', exact: true}).all()) {
-      if ((await pass.getAttribute('aria-pressed')) === 'false') {
-        await pass.click();
-      }
-    }
-
-    await page.getByRole('button', {name: 'Sign off lesson'}).click();
-    await expect(page.getByText('Signed off: completed.')).toBeVisible();
+  for (const pass of await page.getByRole('button', {name: 'Pass', exact: true}).all()) {
+    await pass.click();
   }
 
+  await page.getByRole('button', {name: 'Sign off lesson'}).click();
+  await expect(page.getByText('Signed off: completed.')).toBeVisible();
+
   await page.getByRole('link', {name: 'Courses', exact: true}).click();
-  await page.getByRole('button', {name: /^Scorpion/}).click();
-  await expect(page.getByRole('button', {name: 'Book Scorpion lesson'})).toBeEnabled();
+
+  for (const vehicle of ['Scorpion', 'Hornet']) {
+    await page.getByRole('button', {name: new RegExp(`^${vehicle}`)}).click();
+    await expect(page.getByRole('button', {name: `Book ${vehicle} lesson`})).toBeEnabled();
+  }
+
   await page.getByRole('button', {name: 'Sign out'}).click();
   await expect(page).toHaveURL(/\/login/);
 });
