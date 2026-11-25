@@ -39,18 +39,17 @@ test('lets a visitor sign off a lesson, which unlocks the Scorpion and the Horne
   await page.getByRole('button', {name: /^Scorpion/}).click();
   await expect(page.getByRole('button', {name: 'Book Scorpion lesson'})).toBeDisabled();
 
-  // Guests start with the other three Warthog lessons completed.
+  // Guests start with three Warthog lessons completed, and the last one to repeat.
   await page.getByRole('button', {name: /^Warthog/}).click();
-  await bookLesson(page, 'Warthog');
+  await bookLesson(page, 'Repeat Warthog lesson 4');
   await page.getByRole('link', {name: 'Schedule', exact: true}).click();
   await expect(page.getByText(/These are your own lessons/)).toBeVisible();
   await page.getByRole('link', {name: 'View form'}).first().click();
   await expect(page.getByRole('heading', {name: 'Warthog, lesson 4'})).toBeVisible();
   await page.getByLabel('Mark and sign off early').check();
 
-  for (const pass of await page.getByRole('button', {name: 'Pass', exact: true}).all()) {
-    await pass.click();
-  }
+  // Every skill but one was passed the first time.
+  await page.getByRole('button', {name: 'Pass', exact: true}).last().click();
 
   await page.getByRole('button', {name: 'Sign off lesson'}).click();
   await expect(page.getByText('Signed off: completed.')).toBeVisible();

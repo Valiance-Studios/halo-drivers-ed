@@ -20,24 +20,23 @@ export interface DemoLesson {
 }
 
 /**
- * The Mongoose course, and all but the last of the Warthog's four lessons, one of which took two tries. Completing
- * the last one unlocks the Scorpion and the Hornet.
+ * The Mongoose course, and the Warthog's four lessons, the last of which has to be repeated. Completing it unlocks the Scorpion and the Hornet.
  */
 export const DEMO_LESSONS: DemoLesson[] = [
   {vehicleSlug: 'mongoose', lessonNumber: 1, status: 'completed'},
   {vehicleSlug: 'mongoose', lessonNumber: 2, status: 'completed'},
   {vehicleSlug: 'warthog', lessonNumber: 1, status: 'completed'},
   {vehicleSlug: 'warthog', lessonNumber: 2, status: 'completed'},
+  {vehicleSlug: 'warthog', lessonNumber: 3, status: 'completed'},
   {
     vehicleSlug: 'warthog',
-    lessonNumber: 3,
+    lessonNumber: 4,
     status: 'repeat',
     notes: {
-      student: 'Smooth driving and a steady line for your gunner. Next time, call out turns and bumps sooner.',
-      private: 'Confident at speed, but goes quiet under pressure. Ask for callouts throughout.',
+      student: 'Well recovered, and no one hurt in the ambush. Next time, park under cover before you shut down.',
+      private: 'Ready to finish the course. Rushes the shutdown, so leave time for it.',
     },
   },
-  {vehicleSlug: 'warthog', lessonNumber: 3, status: 'completed'},
 ];
 
 /** When a slot's guest had their past lessons: each slot has its own week, so guests never clash. */
