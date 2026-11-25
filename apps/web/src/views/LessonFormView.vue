@@ -29,10 +29,11 @@
       </p>
       <p class="lesson-form__line">
         <strong>{{ statusNames[lesson.status] }}</strong>
-        <template v-if="isSignedOff">. To correct it, change the form and sign it off again.</template>
+        <template v-if="lesson.cancelReason"> by the instructor: {{ lesson.cancelReason }}</template>
+        <template v-else-if="isSignedOff">. To correct it, change the form and sign it off again.</template>
       </p>
       <label
-        v-if="!hasEnded"
+        v-if="!hasEnded && !isCancelled"
         class="lesson-form__early"
       >
         <input
@@ -107,7 +108,10 @@
       <p class="lesson-form__line">
         {{ summary }}
       </p>
-      <div class="lesson-form__actions">
+      <div
+        v-if="!isCancelled"
+        class="lesson-form__actions"
+      >
         <Button
           label="Sign off lesson"
           :disabled="!canSignOff || !isMarked || !isSaved"
@@ -121,7 +125,50 @@
           :disabled="!canSignOff || !isSaved || saving"
           @click="signOff('missed')"
         />
+        <Button
+          v-if="!isSignedOff && !cancelling"
+          label="Cancel lesson"
+          severity="danger"
+          outlined
+          :disabled="!isSaved || saving"
+          @click="cancelling = true"
+        />
       </div>
+      <form
+        v-if="cancelling"
+        class="lesson-form__cancel"
+        @submit.prevent="cancel"
+      >
+        <label
+          class="lesson-form__label"
+          for="lesson-form-reason"
+        >
+          Why is the instructor cancelling it? The student sees this.
+        </label>
+        <textarea
+          id="lesson-form-reason"
+          v-model="reason"
+          class="lesson-form__reason"
+          rows="2"
+          :maxlength="reasonMaxLength"
+        />
+        <div class="lesson-form__actions">
+          <Button
+            type="submit"
+            label="Cancel this lesson"
+            severity="danger"
+            :disabled="!reason.trim() || !isSaved"
+            :loading="saving"
+          />
+          <Button
+            label="Keep it"
+            severity="secondary"
+            text
+            :disabled="saving"
+            @click="cancelling = false"
+          />
+        </div>
+      </form>
       <Message
         v-if="notice"
         severity="success"
@@ -147,7 +194,7 @@ import type {MarkState} from '@/utils/markSaver';
 
 import {defineComponent, markRaw} from 'vue';
 import {mapStores} from 'pinia';
-import {allMarked, allPassed, isGuestEmail} from '@hde/shared';
+import {allMarked, allPassed, isGuestEmail, REASON_MAX_LENGTH} from '@hde/shared';
 import {api} from '@/services/api';
 import {useAuthStore} from '@/stores/auth';
 import {useCatalogStore} from '@/stores/catalog';
@@ -200,6 +247,10 @@ export default defineComponent({
       errorMessage: '',
       notice: '',
       hasMarked: false,
+      /** Whether the reason for cancelling is being asked for. */
+      cancelling: false,
+      reason: '',
+      reasonMaxLength: REASON_MAX_LENGTH,
       /** Overrides waiting for the lesson to start and end. */
       early: false,
       now: new Date(),
@@ -216,6 +267,9 @@ export default defineComponent({
     isGuest(): boolean {
       return this.lesson !== null && isGuestEmail(this.lesson.studentEmail);
     },
+    isCancelled(): boolean {
+      return this.lesson?.status === 'cancelled';
+    },
     isSignedOff(): boolean {
       return this.lesson !== null && this.lesson.status !== 'booked';
     },
@@ -223,10 +277,10 @@ export default defineComponent({
       return this.lesson !== null && new Date(this.lesson.startsAt) <= this.now;
     },
     canMark(): boolean {
-      return this.hasStarted || this.early;
+      return !this.isCancelled && (this.hasStarted || this.early);
     },
     canSignOff(): boolean {
-      return this.hasEnded || this.early;
+      return !this.isCancelled && (this.hasEnded || this.early);
     },
     isSaved(): boolean {
       return Object.keys(this.markStates).length === 0;
@@ -252,7 +306,7 @@ export default defineComponent({
     },
     /** What signing the lesson off would do, or what it still needs. */
     summary(): string {
-      if (!this.form) {
+      if (!this.form || this.isCancelled) {
         return '';
       }
 
@@ -372,6 +426,22 @@ export default defineComponent({
         event.preventDefault();
       }
     },
+    async cancel() {
+      this.saving = true;
+      this.errorMessage = '';
+      this.notice = '';
+
+      try {
+        await api.cancelLesson(this.scope, this.id, this.reason);
+        await this.refresh();
+        this.cancelling = false;
+        this.hasMarked = false;
+      } catch (error) {
+        this.errorMessage = error instanceof Error ? error.message : 'Could not cancel the lesson.';
+      } finally {
+        this.saving = false;
+      }
+    },
     async signOff(attendance: Attendance) {
       this.saving = true;
       this.errorMessage = '';
@@ -474,6 +544,26 @@ export default defineComponent({
     flex-wrap: wrap;
     gap: 0.75rem;
     margin: 1rem 0;
+  }
+
+  &__cancel {
+    margin: 1rem 0;
+  }
+
+  &__label {
+    display: block;
+    font-weight: 700;
+  }
+
+  &__reason {
+    width: 100%;
+    margin-top: 0.375rem;
+    padding: 0.625rem 0.75rem;
+    background: var(--app-surface);
+    border: 2px solid var(--app-line);
+    border-radius: var(--app-control-radius);
+    color: var(--app-text);
+    font: inherit;
   }
 
   &__spinner {

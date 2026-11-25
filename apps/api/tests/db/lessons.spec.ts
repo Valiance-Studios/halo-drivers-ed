@@ -261,6 +261,36 @@ describe('lesson forms', () => {
   });
 });
 
+describe("cancelling on the instructor's behalf", () => {
+  it('is allowed until sign-off, even late, and gives the student the reason', async () => {
+    const id = await book(at(8));
+    await service.mark(id, 'startEngine', {result: 'pass', early: false}, null);
+
+    expect(await service.cancel(id, 'Away on a mission.', null)).toMatchObject({
+      status: 'cancelled',
+      cancelReason: 'Away on a mission.',
+    });
+    expect((await service.form(id, null)).results).toEqual({});
+    expect(await new PostgresBookingRepository(db).listForStudent(STUDENT)).toMatchObject([
+      {status: 'cancelled', cancelReason: 'Away on a mission.'},
+    ]);
+    // Its time is free again.
+    await book(at(8), 'mongoose', OTHER);
+  });
+
+  it('is refused once signed off or cancelled, and for other students when held to one', async () => {
+    const id = await book(at(8));
+    expect(await errorCode(service.cancel(id, 'Away.', OTHER))).toBe('not-found');
+    await signOff(id, marks(1, 'pass'));
+    expect(await errorCode(service.cancel(id, 'Away.', null))).toBe('sign-off-conflict');
+
+    const other = await book(at(9));
+    await service.cancel(other, 'Away.', null);
+    expect(await errorCode(service.cancel(other, 'Again.', null))).toBe('sign-off-conflict');
+    expect(await errorCode(signOff(other, marks(2, 'pass')))).toBe('sign-off-conflict');
+  });
+});
+
 describe('lesson notes', () => {
   const NOTES = {student: 'Brake sooner.', private: 'Nervous on hills.'};
   const signOffWith = (id: string, results: SkillResults, notes = NOTES) =>
@@ -353,6 +383,14 @@ describe('lesson constraints', () => {
       .where(eq(bookings.id, id));
 
     expect(await constraint(update)).toBe('bookings_note_length');
+  });
+
+  it('rejects a reason on a lesson that is not cancelled, or an empty one', async () => {
+    const id = await book(at(8));
+    const update = (set: object) => constraint(db.update(bookings).set(set).where(eq(bookings.id, id)));
+
+    expect(await update({cancelReason: 'Away.'})).toBe('bookings_cancel_reason');
+    expect(await update({status: 'cancelled', cancelReason: ''})).toBe('bookings_cancel_reason');
   });
 
   it('rejects a completed lesson without its number or signature', async () => {

@@ -26,6 +26,7 @@ const lesson = (vehicleSlug: string, status: BookingStatus, lessonNumber: number
   endsAt: '2026-06-08T13:00:00.000Z',
   status,
   lessonNumber,
+  cancelReason: null,
 });
 const FIRST = vehicle('first');
 const SECOND = vehicle('second', 'first');

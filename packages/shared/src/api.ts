@@ -25,6 +25,7 @@ export const API_ERROR_CODES = [
   'too-late-to-cancel',
   'too-early',
   'sign-off-conflict',
+  'time-off-overlap',
   'internal',
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

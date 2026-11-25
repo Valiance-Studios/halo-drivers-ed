@@ -21,8 +21,16 @@
           With {{ catalogStore.instructorName(lesson.instructorSlug)
           }}<template v-if="'studentEmail' in lesson">, for {{ lesson.studentName ?? lesson.studentEmail }}</template>
         </p>
+        <p
+          v-if="lesson.cancelReason"
+          class="lesson-list__line lesson-list__line--reason"
+        >
+          Reason: {{ lesson.cancelReason }}
+        </p>
       </div>
-      <span class="lesson-list__status">{{ statusNames[lesson.status] }}</span>
+      <span class="lesson-list__status">{{
+        lesson.cancelReason ? 'Cancelled by the instructor' : statusNames[lesson.status]
+      }}</span>
       <slot
         name="actions"
         :lesson="lesson"
@@ -104,5 +112,10 @@ export default defineComponent({
     color: var(--app-accent-text);
     font-weight: 700;
   }
+}
+
+.lesson-list__line--reason {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 </style>

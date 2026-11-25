@@ -4,11 +4,13 @@ import type {TokenVerifier} from '#src/auth/tokenVerifier.ts';
 import type {BookingRepository} from '#src/repositories/bookingRepository.ts';
 import type {DemoRepository} from '#src/repositories/demoRepository.ts';
 import type {LessonRepository} from '#src/repositories/lessonRepository.ts';
+import type {TimeOffRepository} from '#src/repositories/timeOffRepository.ts';
 
 import {describe, expect, it, vi} from 'vite-plus/test';
 import {createApp} from '#src/app.ts';
 import {BookingService} from '#src/bookings/bookingService.ts';
 import {LessonService} from '#src/lessons/lessonService.ts';
+import {TimeOffService} from '#src/timeOff/timeOffService.ts';
 
 const VEHICLE: Vehicle = {
   slug: 'warthog',
@@ -37,12 +39,14 @@ const BOOKING: Booking = {
   endsAt: '2026-06-09T13:00:00.000Z',
   status: 'booked',
   lessonNumber: null,
+  cancelReason: null,
 };
 
 /** Holds one lesson, which belongs to pat@example.com. */
 const bookingRepository: BookingRepository = {
   listForStudent: async (email) => (email === 'pat@example.com' ? [BOOKING] : []),
   listAvailability: async () => [],
+  listTimeOff: async () => [],
   listBusy: async () => [],
   create: async () => null,
   cancel: async () => null,
@@ -97,6 +101,8 @@ const demo: DemoRepository = {
   clearExpired: async () => {},
 };
 
+const timeOffRepository: TimeOffRepository = {list: async () => [], add: async () => null, remove: async () => false};
+
 function makeApp(overrides: Partial<AppDependencies> = {}) {
   const roles: Record<string, AllowlistRole> = {'pat@example.com': 'admin', 'sam@example.com': 'student'};
 
@@ -111,6 +117,7 @@ function makeApp(overrides: Partial<AppDependencies> = {}) {
     demo,
     bookings: new BookingService(bookingRepository, catalog),
     lessons: new LessonService(lessonRepository, catalog),
+    timeOff: new TimeOffService(timeOffRepository, catalog),
     ...overrides,
   });
 }
@@ -219,6 +226,10 @@ describe('API', () => {
     ['GET', `/api/admin/lessons/${BOOKING.id}/form`],
     ['PUT', `/api/admin/lessons/${BOOKING.id}/results/startEngine`],
     ['PUT', `/api/admin/lessons/${BOOKING.id}/notes`],
+    ['PUT', `/api/admin/lessons/${BOOKING.id}/cancel`],
+    ['GET', '/api/admin/instructors/sergeant-johnson/time-off'],
+    ['POST', '/api/admin/instructors/sergeant-johnson/time-off'],
+    ['DELETE', `/api/admin/time-off/${BOOKING.id}`],
     ['PUT', `/api/admin/lessons/${BOOKING.id}/sign-off`],
   ])('keeps students out of %s %s', async (method, path) => {
     const headers = {...SIGNED_IN, Authorization: 'Bearer valid-sam@example.com'};
@@ -238,6 +249,9 @@ describe('API', () => {
     ['results/startEngine', '{"result":"pass","early":"yes"}'],
     ['sign-off', '{"results":{},"notes":{"student":"","private":""},"attendance":"missed","early":1}'],
     ['sign-off', '{"results":{},"attendance":"missed"}'],
+    ['cancel', '{}'],
+    ['cancel', '{"reason":"  "}'],
+    ['cancel', JSON.stringify({reason: 'x'.repeat(501)})],
     ['notes', '{}'],
     ['notes', '{"notes":{"student":"Only one"}}'],
     ['notes', '{"notes":{"student":7,"private":""}}'],
@@ -252,6 +266,29 @@ describe('API', () => {
     });
 
     expect(response.status).toBe(400);
+  });
+
+  it.each([
+    '{}',
+    '{"startsOn":"2099-02-30","endsOn":"2099-03-02"}',
+    '{"startsOn":"2099-03-02","endsOn":"2099-03-01"}',
+    '{"startsOn":"2020-01-01","endsOn":"2099-01-02"}',
+    '{"startsOn":"2099-03-01","endsOn":"2099-03-02","cancel":{"lessonIds":["x"],"reason":"Away"}}',
+    '{"startsOn":"2099-03-01","endsOn":"2099-03-02","cancel":{"lessonIds":[],"reason":""}}',
+  ])('rejects the time off %s', async (body) => {
+    const path = '/api/admin/instructors/sergeant-johnson/time-off';
+    const response = await makeApp().request(path, {method: 'POST', headers: SIGNED_IN, body});
+
+    expect(response.status).toBe(400);
+  });
+
+  it('answers time off that does not exist, or an unknown instructor, with a 404', async () => {
+    const remove = (id: string) =>
+      makeApp().request(`/api/admin/time-off/${id}`, {method: 'DELETE', headers: SIGNED_IN});
+
+    expect((await remove('x')).status).toBe(404);
+    expect((await remove(BOOKING.id)).status).toBe(404);
+    expect((await get(makeApp(), '/api/admin/instructors/nobody/time-off', SIGNED_IN)).status).toBe(404);
   });
 
   it('remembers the name an account signs in with', async () => {

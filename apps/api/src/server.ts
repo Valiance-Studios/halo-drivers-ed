@@ -10,6 +10,8 @@ import {PostgresBookingRepository} from '#src/repositories/bookingRepository.ts'
 import {PostgresCatalogRepository} from '#src/repositories/catalogRepository.ts';
 import {PostgresDemoRepository} from '#src/repositories/demoRepository.ts';
 import {PostgresLessonRepository} from '#src/repositories/lessonRepository.ts';
+import {PostgresTimeOffRepository} from '#src/repositories/timeOffRepository.ts';
+import {TimeOffService} from '#src/timeOff/timeOffService.ts';
 
 const config = loadConfig();
 const {db, close} = connect(config.databaseUrl);
@@ -24,6 +26,7 @@ const app = createApp({
   demo: new PostgresDemoRepository(db),
   bookings: new BookingService(new PostgresBookingRepository(db), catalog),
   lessons: new LessonService(new PostgresLessonRepository(db), catalog),
+  timeOff: new TimeOffService(new PostgresTimeOffRepository(db), catalog),
 });
 
 const server = serve({fetch: app.fetch, port: config.port}, ({port}) => {

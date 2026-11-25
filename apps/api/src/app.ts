@@ -4,6 +4,7 @@ import type {BookingService} from '#src/bookings/bookingService.ts';
 import type {RateLimits} from '#src/http/rateLimits.ts';
 import type {SignedInEnv} from '#src/http/signedIn.ts';
 import type {LessonService} from '#src/lessons/lessonService.ts';
+import type {TimeOffService} from '#src/timeOff/timeOffService.ts';
 import type {AllowlistRepository} from '#src/repositories/allowlistRepository.ts';
 import type {CatalogRepository} from '#src/repositories/catalogRepository.ts';
 import type {DemoRepository} from '#src/repositories/demoRepository.ts';
@@ -15,6 +16,7 @@ import {APP_CHECK_HEADER} from '@hde/shared';
 import {bookingRoutes} from '#src/http/bookingRoutes.ts';
 import {clearExpiredDemos, demoRoutes} from '#src/http/demoRoutes.ts';
 import {adminLessonRoutes, guestLessonRoutes, lessonRoutes} from '#src/http/lessonRoutes.ts';
+import {timeOffRoutes} from '#src/http/timeOffRoutes.ts';
 import {ApiError} from '#src/http/errors.ts';
 import {DEFAULT_RATE_LIMITS, rateLimit} from '#src/http/rateLimits.ts';
 
@@ -26,6 +28,7 @@ export interface AppDependencies {
   demo: DemoRepository;
   bookings: BookingService;
   lessons: LessonService;
+  timeOff: TimeOffService;
   rateLimits?: RateLimits;
 }
 
@@ -46,6 +49,7 @@ export function createApp({
   demo,
   bookings,
   lessons,
+  timeOff,
   rateLimits = DEFAULT_RATE_LIMITS,
 }: AppDependencies): Hono {
   const limitBody = bodyLimit({
@@ -113,7 +117,7 @@ export function createApp({
     .route('/', demoRoutes(demo))
     .use(requireAllowed)
     .on('GET', ['/slots', '/admin/lessons'], clearExpiredDemos(demo))
-    .on('POST', '/bookings', clearExpiredDemos(demo))
+    .on('POST', ['/bookings', '/admin/instructors/:slug/time-off'], clearExpiredDemos(demo))
     .get('/me', async (c) => {
       const {me, identity} = c.var;
 
@@ -129,6 +133,7 @@ export function createApp({
     .route('/', bookingRoutes(bookings))
     .route('/', lessonRoutes(lessons))
     .route('/admin', adminLessonRoutes(lessons))
+    .route('/admin', timeOffRoutes(timeOff))
     .route('/demo', guestLessonRoutes(lessons));
 
   const app = new Hono();

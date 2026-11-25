@@ -17,6 +17,8 @@ export interface Booking {
   status: BookingStatus;
   /** Which of the course's lessons this was; null until it is signed off as attended. */
   lessonNumber: number | null;
+  /** Why the instructor cancelled it; null unless they did. */
+  cancelReason: string | null;
 }
 
 /** A lesson as admins see it, with its student. */

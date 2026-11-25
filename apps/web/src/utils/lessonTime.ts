@@ -24,3 +24,11 @@ export function lessonDayAndTime(iso: string): string {
 export function timeZoneName(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone.replaceAll('_', ' ');
 }
+
+/** Whole days, e.g. "Jun 8, 2026 to Jun 12, 2026". Dates are like "2026-06-08", and not in any time zone. */
+export function daysText({startsOn, endsOn}: {startsOn: string; endsOn: string}): string {
+  const text = (date: string) =>
+    new Date(`${date}T00:00:00Z`).toLocaleDateString([], {dateStyle: 'medium', timeZone: 'UTC'});
+
+  return startsOn === endsOn ? text(startsOn) : `${text(startsOn)} to ${text(endsOn)}`;
+}

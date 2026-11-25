@@ -37,11 +37,13 @@ A dialog to choose an instructor, a day and a time in the next 14 days, in the v
 
 ## My Lessons (`/lessons`)
 
-**Upcoming** lessons, then **Past and cancelled** ones, with the vehicle, time, instructor and status. An upcoming lesson can be cancelled until 24 hours before it starts. **See results** shows how each skill went in a lesson that was signed off as attended, and the instructor's note.
+**Upcoming** lessons, then **Past and cancelled** ones, with the vehicle, time, instructor and status. One cancelled by its instructor says so, with the reason. An upcoming lesson can be cancelled until 24 hours before it starts. **See results** shows how each skill went in a lesson that was signed off as attended, and the instructor's note.
 
 ## Schedule (`/schedule`)
 
 Admins and demo guests only; others are sent to Courses. Guests see only their own lessons, with a line saying so, and can sign them off. Lessons **To sign off** (started and not signed off), **Upcoming** and **Signed off**, for everyone or, with the **View as** list, one instructor. Demo guests' lessons are hidden unless **Show demo guests** is checked, which appears when there are some. Every lesson links to its form, which cannot be marked before the lesson starts. The choice of instructor lasts until the page is reloaded or the account signs out.
+
+With one instructor chosen, admins also see their **time off** that is not over, and add or remove whole days (Eastern). If lessons are booked in the chosen days, they are listed, and have to be cancelled together, with a reason, for the time off to be added.
 
 ### Lesson Form (`/schedule/:id`)
 
@@ -51,6 +53,7 @@ The student's name (their email until they have signed in) and the lesson's skil
 - **Notes**: one the student reads with their results, and a private one for instructors. They save like marks, once typing pauses.
 - **Earlier lessons in this course**, latest first, each opening to its results and notes.
 - **Sign off lesson** works once the lesson has ended and every skill is marked and saved: all passed completes it, and otherwise the student repeats it.
+- **Cancel lesson** works until the lesson is signed off, however late. It asks for a reason, which the student sees, and discards any marks.
 - **Student missed it** works once the lesson has ended, and discards any marks.
 
 Until the lesson ends, a checkbox allows marking and signing it off early. It is off each time the form opens.
