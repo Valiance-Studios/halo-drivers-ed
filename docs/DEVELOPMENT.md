@@ -52,7 +52,50 @@ Conventions are in [CLAUDE.md](../CLAUDE.md#environment-files). In short:
 | `npm run db:generate` | Writes a migration for changes to `apps/api/src/db/schema.ts`. |
 | `npm run db:migrate` / `db:seed` | Applies migrations / loads the catalog and demo slots, on `DATABASE_URL` (local by default). |
 | `npm run db:allow -- <email> [role]` | Allowlists an account as `admin` (the default) or `student`, or changes its role. Give students `student`: admins see and sign off everyone's lessons. |
+| `npm run db:clear -- <what>` | Deletes bookings and what hangs off them. See [Clearing Data](#clearing-data). |
 | `npm run deploy:api` / `deploy:web` | See [DEPLOYMENT.md](DEPLOYMENT.md). |
+
+## Clearing Data
+
+`npm run db:clear` deletes bookings and what hangs off them, from the local database unless you add `--deployed`:
+
+| Command | Deletes |
+| --- | --- |
+| `npm run db:clear -- all` | Every lesson with its results and notes, all time off, and every demo session and guest. |
+| `npm run db:clear -- student <email>` | One student's lessons with their results and notes. They start every course again, and keep their account and role. |
+| `npm run db:clear -- instructor <slug>` | One instructor's time off, and their lessons that are not signed off (booked or cancelled). Signed-off lessons stay, since students' progress counts them; to redo a student's progress, clear that student. |
+
+It always keeps the schema, the vehicles, instructors and their hours, the lesson plans, and the allowlist. To start a **local** database again from nothing, use `npm run db:reset` instead. An instructor's slug is their name in lowercase with hyphens, such as `master-chief`; a wrong one lists them all.
+
+**Nothing is deleted without `--confirm`.** First run the command as above, which shows the database and how many rows would go:
+
+```sh
+npm run db:clear -- student pilot@example.com
+```
+
+```text
+Would delete from the local database (halo_drivers_ed on localhost):
+  Lessons (with their notes): 4
+  Skill results:              10
+  Time off:                   0
+  Demo sessions:              0
+
+Nothing deleted. To delete, run:
+  npm run db:clear -- student pilot@example.com --confirm local
+```
+
+Then run the command it prints. `--confirm` says which database you mean, and the command refuses if that is not the one it would use:
+
+| | Preview | Delete |
+| --- | --- | --- |
+| Local database | `npm run db:clear -- all` | `npm run db:clear -- all --confirm local` |
+| Deployed database | `npm run db:clear -- all --deployed` | `npm run db:clear -- all --deployed --confirm deployed` |
+
+It deletes everything in one transaction or nothing, and is safe while the API is running. Reload any open pages afterward. **There is no undo.**
+
+**"No account is allowlisted as ..."** usually means the wrong database: the local one normally has only `cadet@example.com`, and accounts that sign in on the deployed site are in the deployed one, so add `--deployed`.
+
+Before clearing the deployed database, see [Clearing Deployed Data](DEPLOYMENT.md#clearing-deployed-data).
 
 ## Tests
 

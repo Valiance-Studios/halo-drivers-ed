@@ -37,6 +37,7 @@ Oxfmt (`npm run fmt`) formats the code and Oxlint lints it. ESLint is kept only 
 - Schema lives in `apps/api/src/db/schema.ts`. After changing it, run `npm run db:generate` and commit the new migration in `apps/api/drizzle/`. Never edit an applied migration.
 - Rules that must always hold belong in the database as constraints (foreign keys, checks, exclusion constraints), with a database test that proves the database rejects a violation.
 - `npm run db:reset` refuses any non-local database. Do not weaken that guard.
+- `npm run db:clear` deletes nothing unless `--confirm` says which database it is (`local` or `deployed`), and reaches the deployed one only with `--deployed`. Do not weaken that either, and never run it with `--confirm deployed` unless the user asks.
 
 ## Testing
 

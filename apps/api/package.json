@@ -13,7 +13,8 @@
     "db:migrate": "node --env-file=.env.development scripts/migrate.ts",
     "db:seed": "node --env-file=.env.development scripts/seed.ts",
     "db:reset": "node --env-file=.env.development scripts/reset.ts",
-    "db:allow": "node --env-file=.env.development scripts/allow.ts"
+    "db:allow": "node --env-file=.env.development scripts/allow.ts",
+    "db:clear": "node --env-file=.env.development scripts/clear.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.9",

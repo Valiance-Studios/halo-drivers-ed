@@ -2,15 +2,20 @@ import pg from 'pg';
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
+/** Whether the URL points at a database on this machine. */
+export function isLocalDatabase(databaseUrl: string): boolean {
+  return LOCAL_HOSTS.has(new URL(databaseUrl).hostname);
+}
+
 /**
  * Throws unless the URL points at a database on this machine. Guards the commands that wipe data, so
  * they can never reach Neon even with its URL in the environment.
  */
 export function assertLocalDatabase(databaseUrl: string): void {
-  const {hostname} = new URL(databaseUrl);
-
-  if (!LOCAL_HOSTS.has(hostname)) {
-    throw new Error(`Refusing to wipe the database on "${hostname}": only local databases can be reset.`);
+  if (!isLocalDatabase(databaseUrl)) {
+    throw new Error(
+      `Refusing to wipe the database on "${new URL(databaseUrl).hostname}": only local databases can be reset.`,
+    );
   }
 }
 
