@@ -28,6 +28,8 @@ for (const width of [320, 440]) {
     await page.setViewportSize({width, height: 900});
     await page.goto('/login');
     await signInWithGoogle(page, ALLOWED_USER);
+    // Until then, the login page may be scrolled, which would change where things are.
+    await expect(page.getByRole('heading', {name: 'Courses'})).toBeVisible();
     const menu = page.getByRole('button', {name: 'Menu', exact: true});
     const lessons = page.getByRole('link', {name: 'My lessons'});
     await expect(menu).toHaveAttribute('aria-expanded', 'false');
