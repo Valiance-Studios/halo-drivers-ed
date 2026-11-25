@@ -28,7 +28,7 @@
         ]
       }
     ],
-    "predeploy": ["node scripts/check-firebase-config.ts staging", "npm run build:staging -w @hde/web"]
+    "predeploy": ["node scripts/check-firebase-config.ts staging", "npm run build:staging"]
   },
   "emulators": {
     "auth": {

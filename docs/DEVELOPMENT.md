@@ -46,6 +46,7 @@ Conventions are in [CLAUDE.md](../CLAUDE.md#environment-files). In short:
 | `npm run lint` / `lint:fix` | Oxlint over the whole repository, then ESLint on Vue components (`lint:vue` runs only the latter). |
 | `npm run type-check` | `vue-tsc --build` over every workspace. |
 | `npm run build` | Type-check, then build the web app (`apps/web/dist`) and the API bundle (`apps/api/dist`). Needs no credentials. |
+| `npm run build:staging` | Build the web app with `--mode staging`. |
 | `npm run test:unit` | Vitest unit tests: web (jsdom), API (no database), scripts. |
 | `npm run test:db` | The API's database tests, in their own `halo_drivers_ed_test` database (recreated each run). Needs `npm run db:up`. |
 | `npm run test:e2e` | Playwright. Starts its own Auth emulator, API (port 8082, `halo_drivers_ed_e2e` database, recreated each run) and Vite (5174). Needs `npm run db:up`. |

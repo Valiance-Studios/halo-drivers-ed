@@ -123,7 +123,7 @@ Deploy the API first: Hosting's `/api` rewrite needs the `hde-api` service to ex
   1. Cloud Build builds `apps/api/Dockerfile` as `sa-hde-build-dev` and pushes `us-central1-docker.pkg.dev/vs-halo-drivers-ed-dev/hde/api:<commit>`.
   2. Deploys and runs the `hde-migrate` job (`node dist/release.js`): migrations, then the catalog and demo slots. A failure stops the deploy.
   3. Deploys the `hde-api` service with `DATABASE_URL` from Secret Manager, `APP_CHECK=required`, 0 to 2 instances.
-- **`npm run deploy:web`**: `hosting.predeploy` runs `scripts/check-firebase-config.ts staging` (refuses a missing site key, an emulator build or a debug token), builds with `--mode staging`, then deploys to https://vs-halo-drivers-ed-dev.web.app, with the [security headers](../ARCHITECTURE.md#security-headers) in `firebase.json`. After changing those, sign in on the deployed site and check the browser console: the emulators do not send them.
+- **`npm run deploy:web`**: `hosting.predeploy` runs `scripts/check-firebase-config.ts staging` (refuses a missing site key, an emulator build or a debug token), builds with `--mode staging`, then deploys to https://vs-halo-drivers-ed-dev.web.app, with the [security headers](../ARCHITECTURE.md#security-headers) in `firebase.json`. After changing those, sign in on the deployed site and check the browser console: the emulators do not send them. The build hook calls a root script because the Firebase CLI runs hooks through cross-env, which on Windows turns forward slashes into backslashes and so breaks workspace names such as `@hde/web`.
 
 After deploying, try the change on the site, then record the date under [Project Status](../ARCHITECTURE.md#project-status). Guests already in a demo keep the lessons theirs started with.
 
