@@ -68,6 +68,21 @@ test('an instructor signs lessons off, which unlocks the next course for the stu
   await expect(
     page.getByRole('listitem').filter({hasText: 'Engage and release the parking brake: Passed'}),
   ).toBeVisible();
+
+  await expect(page.getByText('Course Completed')).toBeVisible();
+  await expect(page.getByRole('button', {name: 'Book Mongoose lesson'})).toBeHidden();
+  await page.getByRole('link', {name: 'View Certificate'}).click();
+  const certificate = page.getByRole('article');
+  await expect(certificate.getByText(STUDENT_USER.displayName)).toBeVisible();
+  await expect(certificate.getByText('Mongoose', {exact: true})).toBeVisible();
+  await expect(certificate.getByText('Sergeant Johnson')).toBeVisible();
+  // It survives a reload, and only completed courses have one.
+  await page.reload();
+  await expect(certificate).toBeVisible();
+  await page.goto('/certificates/warthog');
+  await expect(page.getByText('Complete the Warthog course to earn its certificate.')).toBeVisible();
+  await page.getByRole('link', {name: 'Back to courses'}).click();
+
   await page.getByRole('button', {name: /^Warthog/}).click();
   await expect(page.getByRole('button', {name: 'Book Warthog lesson'})).toBeEnabled();
 

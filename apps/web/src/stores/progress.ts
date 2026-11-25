@@ -1,8 +1,9 @@
-import type {AttendedLesson, Vehicle} from '@hde/shared';
+import type {AttendedLesson, CourseCompletion, Vehicle} from '@hde/shared';
 
 import {defineStore} from 'pinia';
 import {
   completedCourses,
+  courseCompletion,
   hasLessonBooked,
   lessonsCompleted,
   lessonsLeft,
@@ -22,6 +23,10 @@ export const useProgressStore = defineStore('progress', {
     /** The courses still to complete before this one; none means it is unlocked. */
     missingFor(): (vehicle: Vehicle) => string[] {
       return (vehicle) => missingPrerequisites(vehicle, this.completedSlugs);
+    },
+    /** How a course was completed; null if it is not. */
+    completion(): (vehicle: Vehicle) => CourseCompletion | null {
+      return (vehicle) => courseCompletion(vehicle, useBookingsStore().bookings);
     },
     /** How many of a course's lessons are completed; null before the first one is attended. */
     lessonsCompleted(): (vehicle: Vehicle) => number | null {

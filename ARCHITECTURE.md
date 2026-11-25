@@ -278,7 +278,7 @@ sequenceDiagram
 
 - **Identity.** A guest is an `allowed_users` row with the role `guest` and a made-up `@demo.invalid` address, so bookings, locks and cascades work as for anyone else. A check constraint ties the role to that domain, where no real address can exist, and the allowlist lookup never returns guests. They are found by the anonymous `uid` in their slot, only until it expires (`demo-ended` after that).
 - **Limits.** Guests are students, and can book `DEMO_BOOKING_LIMIT` lessons, counting cancelled and signed-off ones. The check runs under the same lock as the other booking rules.
-- **Past lessons.** Guests start with the Mongoose course and three of the Warthog's four lessons completed, and the fourth, their latest, to repeat (`demoHistory.ts`). Completing it unlocks the Scorpion and the Hornet. Each slot's are in a week of its own, in free times, so guests never clash.
+- **Past lessons.** Guests start with the Mongoose course and three of the Warthog's four lessons completed, and the fourth, their latest, to repeat (`demoHistory.ts`). Completing it unlocks the Scorpion and the Hornet. They also have one of the Ghost's two lessons completed; the other unlocks the Banshee and the Wraith. Each slot's are in a week of its own, in free times, so guests never clash.
 - **Expired guests** lose access at once. Their data is deleted by the next claim, or the next request their lessons could affect: `GET /api/slots`, `POST /api/bookings`, rescheduling, `GET /api/admin/lessons` and adding time off (`clearExpiredDemos`). Signing out deletes it immediately.
 - **Anonymous accounts** are deleted by the browser on sign-out, or when the demo is full or over, unless Firebase refuses. A visitor who closes the tab leaves theirs in Firebase; deleting those would need Identity Platform or an API that may delete Firebase users.
 - **In the schedule**, guests' lessons are hidden unless an admin checks "Show demo guests".
@@ -346,6 +346,25 @@ stateDiagram-v2
 - Lessons in a course are signed off in order, and one can be corrected until a later one is signed off.
 - A correction is refused if it would lock a course the student has lessons in, or leave them with more lessons than the course has.
 - `PostgresLessonRepository.update` takes the same lock on the student's `allowed_users` row as booking does, so neither can change what the other decided on.
+
+## Certificates
+
+Each completed course has a certificate, at `/certificates/:vehicleSlug`. Nothing is stored: it is worked out from the student's own bookings, as course locks are, so it goes away if a correction means the course is no longer complete. Only the student can see theirs.
+
+```mermaid
+flowchart LR
+    bookings["GET /api/bookings"] --> store["stores/bookings.ts"]
+    store --> progress["stores/progress.ts"]
+    rules["@hde/shared<br/>completedCourses,<br/>courseCompletion"] --> progress
+    progress -- "completedSlugs" --> route["VehicleRoute<br/>ribbon"]
+    progress -- "completedSlugs" --> detail["VehicleDetail<br/>Course Completed"]
+    detail -- "View Certificate" --> view
+    progress -- "completion" --> view["CertificateView"]
+    auth["stores/auth.ts"] -- "displayName" --> view
+    view --> certificate["CourseCertificate"]
+```
+
+The final lesson gives the instructor and the date, which is when it ended, or was signed off if that was earlier, as demo guests can do. Printing uses the browser's own dialog, which can save a PDF; a named `@page` makes it landscape.
 
 ## Theming
 
@@ -502,14 +521,7 @@ One image holds both entry points. Migrations and the catalog seed run as their 
 
 ## Planned Design
 
-Agreed, not built yet. Build these on their own branches, in this order.
-
-### Certificates
-
-A license for each completed course. Once its lessons are all completed:
-
-- Its card on the route map has a ribbon icon, next to the lesson count (`4/4`).
-- Its panel says "Course Completed" in place of the booking button, with a "View Certificate" link, and also shows the count.
+Nothing is agreed and waiting to be built.
 
 ### Ideas, Not Planned
 
@@ -528,6 +540,7 @@ Every diagram in this file, and what it depends on. A change to these sources up
 | Demo | [Demo](#demo) | `apps/api/src/http/demoRoutes.ts`, `apps/api/src/repositories/demoRepository.ts`, `apps/api/src/demo/`, `packages/shared/src/demo.ts`, `apps/web/src/stores/auth.ts` |
 | Time off | [Time Off](#time-off) | `apps/api/src/timeOff/`, `apps/api/src/http/timeOffRoutes.ts`, `apps/api/src/repositories/timeOffRepository.ts`, `apps/web/src/components/TimeOffPanel.vue` |
 | Lesson sign-off | [Lesson Sign-Off](#lesson-sign-off) | `apps/api/src/lessons/`, `apps/api/src/http/lessonRoutes.ts`, `apps/api/src/repositories/lessonRepository.ts`, `packages/shared/src/curriculum.ts` |
+| Certificates | [Certificates](#certificates) | `packages/shared/src/bookings.ts`, `apps/web/src/stores/progress.ts`, `apps/web/src/views/CertificateView.vue`, `VehicleRoute.vue`, `VehicleDetail.vue` |
 | Theming | [Theming](#theming) | `apps/web/src/stores/theme.ts`, `apps/web/src/utils/themePreference.ts`, `apps/web/src/styles/themes.scss`, `apps/web/src/plugins/primevue.ts`, `FactionToggle.vue`, `ThemeToggle.vue` |
 | Tables | [Data Model](#data-model) | `apps/api/src/db/schema.ts`, `apps/api/drizzle/` |
 | Deploy pipeline | [Deployment](#deployment) | `scripts/deploy-api.ts`, `apps/api/Dockerfile`, `apps/api/cloudbuild.yaml`, `firebase.json` |
@@ -548,7 +561,8 @@ Every diagram in this file, and what it depends on. A change to these sources up
 - Lesson plans (53 lessons), instructors' lesson forms, sign-off that unlocks courses, notes and student history (deployed and tried on the site on 2026-11-24), and admins' schedule with View As. Demo guests have the same for their own lessons. Deployed and tried on the site on 2026-11-24.
 - Instructors' [time off](#time-off), and cancelling lessons on their behalf. Deployed and tried on the site on 2026-11-24.
 - `npm run db:clear`, to delete everyone's, a student's or an instructor's data.
-- [Rescheduling](#booking) a lesson. Not deployed yet.
+- [Rescheduling](#booking) a lesson. Deployed and tried on the site on 2026-11-24.
+- [Certificates](#certificates) for completed courses, and a Ghost lesson in guests' history. Not deployed yet.
 - A `student` role, which can book but not sign off.
 - [Demo](#demo) slots for recruiters: 10 at once, 2 hours each. Deployed and tried on the site on 2026-11-24, including that signing out removes the anonymous account.
 - UNSC and Covenant themes, each light and dark, with placeholder artwork.
@@ -570,5 +584,4 @@ Every diagram in this file, and what it depends on. A change to these sources up
 
 ### Next: Features
 
-1. [Certificates](#certificates).
-2. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. Flat shapes drawn in code cannot get close. See [Artwork](docs/UI.md#artwork).
+1. Final artwork: the vehicle and instructor drawings are temporary placeholders that do not closely resemble their Halo 3 designs. Options considered: the owner's own screenshots (under Microsoft's Game Content Usage Rules, with their notice), generated images, or commissioned art. Flat shapes drawn in code cannot get close. See [Artwork](docs/UI.md#artwork).

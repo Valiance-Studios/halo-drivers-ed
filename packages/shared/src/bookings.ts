@@ -19,6 +19,8 @@ export interface Booking {
   lessonNumber: number | null;
   /** Why the instructor cancelled it; null unless they did. */
   cancelReason: string | null;
+  /** When it was last signed off; null until then. */
+  signedOffAt: string | null;
 }
 
 /** A lesson as admins see it, with its student. */
@@ -91,6 +93,34 @@ export function repeatDue(vehicle: Vehicle, bookings: readonly Booking[]): numbe
 /** Whether a lesson of the course is booked and not signed off. While one has to be repeated, this must be it. */
 export function hasLessonBooked(vehicle: Vehicle, bookings: readonly Booking[]): boolean {
   return bookings.some(({vehicleSlug, status}) => vehicleSlug === vehicle.slug && status === 'booked');
+}
+
+/** How a student finished a course, for its certificate. */
+export interface CourseCompletion {
+  /** Who taught the final lesson. */
+  instructorSlug: string;
+  /** When the final lesson ended, or was signed off if that was earlier. */
+  completedAt: string;
+}
+
+/** How the student completed a course, or null if they have not. */
+export function courseCompletion(vehicle: Vehicle, bookings: readonly Booking[]): CourseCompletion | null {
+  if (!completedCourses([vehicle], bookings).includes(vehicle.slug)) {
+    return null;
+  }
+
+  // By number, since an early sign-off can leave the final lesson's time before another's.
+  const [final] = bookings
+    .filter(({vehicleSlug, status}) => vehicleSlug === vehicle.slug && status === 'completed')
+    .sort((a, b) => (b.lessonNumber ?? 0) - (a.lessonNumber ?? 0));
+
+  if (!final) {
+    return null;
+  }
+
+  const {instructorSlug, endsAt, signedOffAt} = final;
+
+  return {instructorSlug, completedAt: signedOffAt !== null && signedOffAt < endsAt ? signedOffAt : endsAt};
 }
 
 /** Slugs of the courses whose required lessons are all completed. */

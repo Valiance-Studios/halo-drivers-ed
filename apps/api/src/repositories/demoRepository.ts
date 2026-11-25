@@ -13,7 +13,7 @@ import {
   skillResults,
   vehicles,
 } from '#src/db/schema.ts';
-import {DEMO_INSTRUCTOR, DEMO_LESSONS, findHistoryTimes, historyPeriod} from '#src/demo/demoHistory.ts';
+import {DEMO_LESSONS, findHistoryTimes, historyPeriod} from '#src/demo/demoHistory.ts';
 
 export interface DemoRepository {
   /** The guest an anonymous account is, or null if it has no demo session or it has ended. */
@@ -134,11 +134,12 @@ async function emptySlot(tx: Transaction, {id, guestEmail}: Slot): Promise<void>
 /** Gives a new guest some past lessons, so there is progress to see without waiting for a lesson to end. */
 async function addHistory(tx: Transaction, slotId: number, studentEmail: string, now: Date): Promise<void> {
   const slugs = [...new Set(DEMO_LESSONS.map(({vehicleSlug}) => vehicleSlug))];
+  const instructorSlugs = [...new Set(DEMO_LESSONS.map(({instructorSlug}) => instructorSlug))];
   const courses = await tx.select().from(vehicles).where(inArray(vehicles.slug, slugs));
-  const windows = await tx
+  const availability = await tx
     .select()
     .from(instructorAvailability)
-    .where(eq(instructorAvailability.instructorSlug, DEMO_INSTRUCTOR));
+    .where(inArray(instructorAvailability.instructorSlug, instructorSlugs));
   const period = historyPeriod(slotId, now);
   const busy = await tx
     .select({startsAt: bookings.startsAt, endsAt: bookings.endsAt})
@@ -148,7 +149,7 @@ async function addHistory(tx: Transaction, slotId: number, studentEmail: string,
         ne(bookings.status, 'cancelled'),
         gt(bookings.endsAt, period.from),
         lt(bookings.startsAt, now),
-        or(eq(bookings.instructorSlug, DEMO_INSTRUCTOR), inArray(bookings.vehicleSlug, slugs)),
+        or(inArray(bookings.instructorSlug, instructorSlugs), inArray(bookings.vehicleSlug, slugs)),
       ),
     );
   const lessons = DEMO_LESSONS.flatMap((lesson) => {
@@ -157,9 +158,9 @@ async function addHistory(tx: Transaction, slotId: number, studentEmail: string,
     return vehicle ? [{...lesson, vehicle}] : [];
   });
   const times = findHistoryTimes(
-    lessons.map(({vehicle}) => vehicle.lessonMinutes),
+    lessons.map(({instructorSlug, vehicle}) => ({instructorSlug, lessonMinutes: vehicle.lessonMinutes})),
     period,
-    windows,
+    availability,
     busy,
   );
 
@@ -167,12 +168,12 @@ async function addHistory(tx: Transaction, slotId: number, studentEmail: string,
     const lesson = lessons[index];
 
     if (lesson) {
-      const {vehicle, lessonNumber, status, notes} = lesson;
+      const {instructorSlug, vehicle, lessonNumber, status, notes} = lesson;
       const [booking] = await tx
         .insert(bookings)
         .values({
           studentEmail,
-          instructorSlug: DEMO_INSTRUCTOR,
+          instructorSlug,
           vehicleSlug: vehicle.slug,
           faction: vehicle.faction,
           ...time,

@@ -40,6 +40,7 @@ const BOOKING: Booking = {
   status: 'booked',
   lessonNumber: null,
   cancelReason: null,
+  signedOffAt: null,
 };
 
 /** Holds one lesson, which belongs to pat@example.com. */

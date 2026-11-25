@@ -48,7 +48,11 @@
       <span class="vehicle-route__name">{{ vehicle.name }}</span>
       <span class="vehicle-route__meta">
         <span>{{ domainName(vehicle) }}</span>
-        <span v-if="progress(vehicle)">
+        <span
+          v-if="progress(vehicle)"
+          class="vehicle-route__progress"
+        >
+          <RibbonIcon v-if="isCompleted(vehicle)" />
           {{ progress(vehicle) }}<span class="visually-hidden"> lessons completed</span>
         </span>
         <span>{{ totalHours(vehicle) }}</span>
@@ -75,12 +79,13 @@ import {useCatalogStore} from '@/stores/catalog';
 import {useProgressStore} from '@/stores/progress';
 import {layoutRoute, ROUTE_HEIGHT, ROUTE_WIDTH} from '@/utils/routeLayout';
 import {domainName, progressText, totalHours} from '@/utils/vehicleText';
+import RibbonIcon from '@/components/RibbonIcon.vue';
 import SubjectArt from '@/components/SubjectArt.vue';
 
 /** A faction's vehicles, joined by their prerequisites. Locked ones can still be selected. On narrow screens, a list. */
 export default defineComponent({
   name: 'VehicleRoute',
-  components: {SubjectArt},
+  components: {RibbonIcon, SubjectArt},
   props: {
     vehicles: {type: Array as PropType<Vehicle[]>, required: true},
     faction: {type: String as PropType<Faction>, required: true},
@@ -106,6 +111,9 @@ export default defineComponent({
     totalHours,
     isLocked(vehicle: Vehicle): boolean {
       return this.progressStore.missingFor(vehicle).length > 0;
+    },
+    isCompleted({slug}: Vehicle): boolean {
+      return this.progressStore.completedSlugs.includes(slug);
     },
     progress(vehicle: Vehicle): string {
       return progressText(vehicle, this.progressStore.lessonsCompleted(vehicle));
@@ -200,6 +208,12 @@ export default defineComponent({
     display: flex;
     justify-content: space-between;
     margin-top: 0.5rem;
+  }
+
+  &__progress {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: center;
   }
 
   &__after {

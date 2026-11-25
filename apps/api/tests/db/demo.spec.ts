@@ -137,18 +137,21 @@ describe('demo slots', () => {
 });
 
 describe('guests', () => {
-  it('start one lesson short of completing the Warthog, with the latest one to repeat', async () => {
+  it('start one lesson short of completing the Warthog, with the latest one to repeat, and the Ghost', async () => {
     await demo.claim('a', NOW);
     const email = await guestEmail('a');
     const lessons = await new PostgresBookingRepository(db).listForStudent(email);
 
-    expect(lessons.map(({vehicleSlug, status}) => [vehicleSlug, status])).toEqual([
+    expect(lessons.map(({vehicleSlug, status}) => [vehicleSlug, status]).filter(([slug]) => slug !== 'ghost')).toEqual([
       ['mongoose', 'completed'],
       ['mongoose', 'completed'],
       ['warthog', 'completed'],
       ['warthog', 'completed'],
       ['warthog', 'completed'],
       ['warthog', 'repeat'],
+    ]);
+    expect(lessons.filter(({vehicleSlug}) => vehicleSlug === 'ghost')).toMatchObject([
+      {instructorSlug: 'arbiter', status: 'completed', lessonNumber: 1},
     ]);
     expect(await db.select().from(skillResults).where(eq(skillResults.result, 'fail'))).toHaveLength(1);
   });
@@ -173,22 +176,28 @@ describe('guests', () => {
     await expect(book()).rejects.toMatchObject({code: 'demo-limit'});
   });
 
-  it('unlock the Scorpion and the Hornet by completing one lesson', async () => {
+  it.each([
+    {course: 'warthog', instructor: 'master-chief', number: 4, unlocks: ['scorpion', 'hornet']},
+    {course: 'ghost', instructor: 'arbiter', number: 2, unlocks: ['banshee', 'wraith']},
+  ])('unlock $unlocks by completing one $course lesson', async ({course, instructor, number, unlocks}) => {
     await demo.claim('a', NOW);
     const email = await guestEmail('a');
     const catalog = new PostgresCatalogRepository(db);
     const bookingService = new BookingService(new PostgresBookingRepository(db), catalog, () => NOW);
     const lessonService = new LessonService(new PostgresLessonRepository(db), catalog, () => NOW);
     const book = async (vehicleSlug: string) => {
-      const [slot] = await bookingService.slots(email, vehicleSlug, 'master-chief');
+      const [slot] = await bookingService.slots(email, vehicleSlug, instructor);
 
-      return bookingService.book(email, {vehicleSlug, instructorSlug: 'master-chief', startsAt: slot!.startsAt});
+      return bookingService.book(email, {vehicleSlug, instructorSlug: instructor, startsAt: slot!.startsAt});
     };
 
-    await expect(book('scorpion')).rejects.toMatchObject({code: 'course-locked'});
-    const {id} = await book('warthog');
+    for (const locked of unlocks) {
+      await expect(book(locked)).rejects.toMatchObject({code: 'course-locked'});
+    }
+
+    const {id} = await book(course);
     const {lesson} = await lessonService.form(id, email);
-    expect(lesson.number).toBe(4);
+    expect(lesson.number).toBe(number);
 
     const results = Object.fromEntries(lesson.skills.map((skill) => [skill.id, 'pass' as const]));
     await lessonService.signOff(
@@ -197,8 +206,10 @@ describe('guests', () => {
       email,
       email,
     );
-    expect(await book('scorpion')).toMatchObject({status: 'booked'});
-    expect(await book('hornet')).toMatchObject({status: 'booked'});
+
+    for (const unlocked of unlocks) {
+      expect(await book(unlocked)).toMatchObject({status: 'booked'});
+    }
   });
 
   it('cannot be found by email, so no signed-in account can become one', async () => {

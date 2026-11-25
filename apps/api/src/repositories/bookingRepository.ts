@@ -60,6 +60,7 @@ export function toBooking({
   status,
   lessonNumber,
   cancelReason,
+  signedOffAt,
 }: BookingRow): Booking {
   return {
     id,
@@ -70,6 +71,7 @@ export function toBooking({
     status,
     lessonNumber,
     cancelReason,
+    signedOffAt: signedOffAt?.toISOString() ?? null,
   };
 }
 
